@@ -1,0 +1,40 @@
+import type { DrivingSession } from "@/types/session";
+
+export const mockSessions: DrivingSession[] = [
+  {
+    id: "session-1",
+    vehicleId: "gti-1",
+    title: "Backroad Pulls",
+    startedAt: "2026-06-18T18:00:00Z",
+    durationSeconds: 1080,
+    distanceMiles: 24.6,
+    maxSpeedMph: 87,
+    avgSpeedMph: 54,
+    maxRpm: 6420,
+    createdAt: "2026-06-18T18:00:00Z",
+  },
+  {
+    id: "session-2",
+    vehicleId: "gti-1",
+    title: "Commute Home",
+    startedAt: "2026-06-17T17:30:00Z",
+    durationSeconds: 1860,
+    distanceMiles: 19.2,
+    maxSpeedMph: 71,
+    avgSpeedMph: 42,
+    maxRpm: 5100,
+    createdAt: "2026-06-17T17:30:00Z",
+  },
+  {
+    id: "session-3",
+    vehicleId: "mustang-1",
+    title: "Baseline Test",
+    startedAt: "2026-06-15T19:00:00Z",
+    durationSeconds: 720,
+    distanceMiles: 8.4,
+    maxSpeedMph: 64,
+    avgSpeedMph: 38,
+    maxRpm: 5800,
+    createdAt: "2026-06-15T19:00:00Z",
+  },
+];
