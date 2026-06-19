@@ -1,7 +1,15 @@
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
+
 import SessionCard from "@/components/sessions/SessionCard";
 import { mockSessions } from "@/lib/mockSessions";
 
-export default function SessionsPage() {
+export default async function SessionsPage() {
+    const { userId } = await auth();
+
+    if (!userId) {
+        redirect("/login");
+    }
     return (
         <main className="min-h-screen bg-zinc-950 px-6 py-10 text-white">
             <div className="mx-auto max-w-7xl">
