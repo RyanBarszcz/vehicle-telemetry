@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.database import get_db
 from app.models.user import User
+from jose import jwt
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -17,28 +18,18 @@ def get_clerk_user_id(
 ) -> str:
     token = credentials.credentials
 
-    response = requests.get(
-        "https://api.clerk.com/v1/sessions/verify",
-        headers={
-            "Authorization": f"Bearer {settings.CLERK_SECRET_KEY}",
-            "Content-Type": "application/json",
-        },
-        params={
-            "token": token,
-        },
-    )
+    try:
+        payload = jwt.get_unverified_claims(token)
 
-    if response.status_code != 200:
+        user_id = payload.get("sub")
+
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+        return user_id
+
+    except Exception:
         raise HTTPException(status_code=401, detail="Unauthorized")
-
-    data = response.json()
-    user_id = data.get("user_id")
-
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
-    return user_id
-
 
 def get_clerk_user(user_id: str):
     response = requests.get(

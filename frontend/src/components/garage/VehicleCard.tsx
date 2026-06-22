@@ -9,7 +9,10 @@ type VehicleCardProps = {
 
 export default function VehicleCard({ vehicle }: VehicleCardProps) {
     const displayName =
-        vehicle.nickname ?? `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
+        vehicle.nickname || `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
+
+    const subtitle = `${vehicle.year} ${vehicle.make} ${vehicle.model}${vehicle.trim ? ` ${vehicle.trim}` : ""
+        }`;
 
     return (
         <Link
@@ -27,9 +30,14 @@ export default function VehicleCard({ vehicle }: VehicleCardProps) {
                     </h2>
 
                     <p className="mt-1 text-sm text-zinc-400">
-                        {vehicle.year} {vehicle.make} {vehicle.model}
-                        {vehicle.trim ? ` ${vehicle.trim}` : ""}
+                        {subtitle}
                     </p>
+
+                    {vehicle.vin && (
+                        <p className="mt-1 text-xs text-zinc-500">
+                            VIN: {vehicle.vin}
+                        </p>
+                    )}
                 </div>
 
                 <span className="rounded-full bg-green-500/10 px-3 py-1 text-xs font-medium text-green-400">
@@ -41,19 +49,19 @@ export default function VehicleCard({ vehicle }: VehicleCardProps) {
                 <div className="rounded-2xl bg-zinc-900/70 p-4">
                     <Activity className="mb-2 h-4 w-4 text-blue-400" />
                     <p className="text-xs text-zinc-500">Sessions</p>
-                    <p className="mt-1 font-semibold text-white">8</p>
+                    <p className="mt-1 font-semibold text-white">0</p>
                 </div>
 
                 <div className="rounded-2xl bg-zinc-900/70 p-4">
                     <Radio className="mb-2 h-4 w-4 text-blue-400" />
                     <p className="text-xs text-zinc-500">Last Sync</p>
-                    <p className="mt-1 font-semibold text-white">Today</p>
+                    <p className="mt-1 font-semibold text-white">Never</p>
                 </div>
 
                 <div className="rounded-2xl bg-zinc-900/70 p-4">
                     <Gauge className="mb-2 h-4 w-4 text-blue-400" />
                     <p className="text-xs text-zinc-500">Max RPM</p>
-                    <p className="mt-1 font-semibold text-white">6,420</p>
+                    <p className="mt-1 font-semibold text-white">—</p>
                 </div>
             </div>
         </Link>

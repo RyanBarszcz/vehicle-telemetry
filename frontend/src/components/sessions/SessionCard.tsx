@@ -1,18 +1,14 @@
 import Link from "next/link";
 import { Activity, Gauge, Route, Timer } from "lucide-react";
 
-import type { DrivingSession } from "@/types/session";
+import type { DrivingSession } from "@/lib/api";
 
 type SessionCardProps = {
     session: DrivingSession;
 };
 
-export default function SessionCard({
-    session,
-}: SessionCardProps) {
-    const durationMinutes = Math.floor(
-        session.durationSeconds / 60
-    );
+export default function SessionCard({ session }: SessionCardProps) {
+    const durationMinutes = Math.floor(session.duration_seconds / 60);
 
     return (
         <Link
@@ -26,9 +22,7 @@ export default function SessionCard({
                     </h2>
 
                     <p className="mt-1 text-sm text-zinc-400">
-                        {new Date(
-                            session.startedAt
-                        ).toLocaleDateString()}
+                        {new Date(session.started_at).toLocaleDateString()}
                     </p>
                 </div>
 
@@ -40,9 +34,7 @@ export default function SessionCard({
             <div className="mt-6 grid gap-3 sm:grid-cols-4">
                 <div className="rounded-2xl bg-zinc-900/70 p-4">
                     <Timer className="mb-2 h-4 w-4 text-blue-400" />
-                    <p className="text-xs text-zinc-500">
-                        Duration
-                    </p>
+                    <p className="text-xs text-zinc-500">Duration</p>
                     <p className="mt-1 font-semibold text-white">
                         {durationMinutes} min
                     </p>
@@ -50,31 +42,25 @@ export default function SessionCard({
 
                 <div className="rounded-2xl bg-zinc-900/70 p-4">
                     <Route className="mb-2 h-4 w-4 text-blue-400" />
-                    <p className="text-xs text-zinc-500">
-                        Distance
-                    </p>
+                    <p className="text-xs text-zinc-500">Distance</p>
                     <p className="mt-1 font-semibold text-white">
-                        {session.distanceMiles ?? 0} mi
+                        {session.distance_miles ?? 0} mi
                     </p>
                 </div>
 
                 <div className="rounded-2xl bg-zinc-900/70 p-4">
                     <Activity className="mb-2 h-4 w-4 text-blue-400" />
-                    <p className="text-xs text-zinc-500">
-                        Max Speed
-                    </p>
+                    <p className="text-xs text-zinc-500">Max Speed</p>
                     <p className="mt-1 font-semibold text-white">
-                        {session.maxSpeedMph} mph
+                        {session.max_speed_mph} mph
                     </p>
                 </div>
 
                 <div className="rounded-2xl bg-zinc-900/70 p-4">
                     <Gauge className="mb-2 h-4 w-4 text-blue-400" />
-                    <p className="text-xs text-zinc-500">
-                        Max RPM
-                    </p>
+                    <p className="text-xs text-zinc-500">Max RPM</p>
                     <p className="mt-1 font-semibold text-white">
-                        {session.maxRpm.toLocaleString()}
+                        {session.max_rpm.toLocaleString()}
                     </p>
                 </div>
             </div>

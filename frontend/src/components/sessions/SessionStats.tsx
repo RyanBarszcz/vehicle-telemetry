@@ -1,36 +1,34 @@
-import {
-    Activity,
-    Gauge,
-    Route,
-    Timer,
-} from "lucide-react";
+import { Activity, Gauge, Route, Timer } from "lucide-react";
 
 import MetricCard from "@/components/telemetry/MetricCard";
+import type { DrivingSession } from "@/lib/api";
 
-export default function SessionStats() {
+type SessionStatsProps = {
+    session: DrivingSession;
+};
+
+export default function SessionStats({ session }: SessionStatsProps) {
+    const durationMinutes = Math.floor(session.duration_seconds / 60);
+
     return (
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <MetricCard
-                label="Duration"
-                value="18 min"
-                icon={<Timer />}
-            />
+            <MetricCard label="Duration" value={`${durationMinutes} min`} icon={<Timer />} />
 
             <MetricCard
                 label="Distance"
-                value="24.6 mi"
+                value={`${session.distance_miles ?? 0} mi`}
                 icon={<Route />}
             />
 
             <MetricCard
                 label="Max Speed"
-                value="87 mph"
+                value={`${session.max_speed_mph} mph`}
                 icon={<Activity />}
             />
 
             <MetricCard
                 label="Max RPM"
-                value="6,420"
+                value={session.max_rpm.toLocaleString()}
                 icon={<Gauge />}
             />
         </section>

@@ -25,6 +25,11 @@ class Vehicle(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     garage_users = relationship("GarageVehicle", back_populates="vehicle", cascade="all, delete-orphan")
+    sessions = relationship(
+    "DrivingSession",
+    back_populates="vehicle",
+    cascade="all, delete-orphan",
+)
 
 
 class GarageVehicle(Base):

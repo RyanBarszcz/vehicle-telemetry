@@ -7,10 +7,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSignIn } from "@clerk/nextjs/legacy";
 import { toast } from "sonner";
+import { useAuth } from "@clerk/nextjs";
+import { syncAccount } from "@/lib/api";
 
 export default function LoginPage() {
     const router = useRouter();
     const { signIn, setActive, isLoaded } = useSignIn();
+    const { getToken } = useAuth();
 
     const [formData, setFormData] = useState({
         email: "",
@@ -48,6 +51,12 @@ export default function LoginPage() {
                 await setActive({
                     session: result.createdSessionId,
                 });
+
+                const token = await getToken();
+
+                if (token) {
+                    await syncAccount(token);
+                }
 
                 toast.success("Signed in successfully", { id: toastId });
 
@@ -92,6 +101,12 @@ export default function LoginPage() {
                 await setActive({
                     session: result.createdSessionId,
                 });
+
+                const token = await getToken();
+
+                if (token) {
+                    await syncAccount(token);
+                }
 
                 toast.success("Signed in successfully", { id: toastId });
 

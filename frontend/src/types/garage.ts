@@ -1,11 +1,7 @@
 export type GarageVehicle = {
   id: string;
-
-  userId: string;
-
-  vehicleId: string;
-
+  user_id: string;
+  vehicle_id: string;
   role: "OWNER" | "EDITOR" | "VIEWER";
-
-  addedAt: string;
+  added_at: string;
 };

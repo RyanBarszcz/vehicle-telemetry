@@ -8,8 +8,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { useSignUp } from "@clerk/nextjs/legacy";
 import { toast } from "sonner";
-// TODO: syncAccount from setupsRus
-// import { syncAccount } from "@/lib/api";
+import { syncAccount } from "@/lib/api";
 
 export default function SignUpPage() {
     const router = useRouter();
@@ -92,7 +91,7 @@ export default function SignUpPage() {
                 const token = await getToken();
 
                 if (token) {
-                    // await syncAccount(token);
+                    await syncAccount(token);
                 }
 
                 toast.success("Account created successfully!", {

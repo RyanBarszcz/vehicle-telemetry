@@ -4,14 +4,12 @@ export type Vehicle = {
   year: number;
   make: string;
   model: string;
-  trim?: string;
+  trim: string | null;
 
-  nickname?: string;
+  nickname: string | null;
+  vin: string | null;
+  image_url: string | null;
 
-  vin?: string;
-
-  imageUrl?: string;
-
-  createdAt: string;
-  updatedAt: string;
+  created_at: string;
+  updated_at: string;
 };
