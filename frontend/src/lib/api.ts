@@ -175,3 +175,75 @@ export async function getSession(
 
   return res.json();
 }
+
+export type TelemetryPoint = {
+  id: string;
+  session_id: string;
+  timestamp: string;
+
+  rpm: number;
+  speed_mph: number;
+  throttle_percent: number;
+  coolant_temp_f: number;
+
+  intake_temp_f: number | null;
+  boost_psi: number | null;
+  fuel_level_percent: number | null;
+  battery_voltage: number | null;
+};
+
+export type CreateTelemetryPointInput = {
+  timestamp?: string;
+
+  rpm: number;
+  speed_mph: number;
+  throttle_percent: number;
+  coolant_temp_f: number;
+
+  intake_temp_f?: number;
+  boost_psi?: number;
+  fuel_level_percent?: number;
+  battery_voltage?: number;
+};
+
+export async function getSessionTelemetry(
+  token: string,
+  sessionId: string
+): Promise<TelemetryPoint[]> {
+  const res = await fetch(`${API_URL}/sessions/${sessionId}/telemetry`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error("Get telemetry failed:", res.status, errorText);
+    throw new Error("Failed to fetch telemetry");
+  }
+
+  return res.json();
+}
+
+export async function createTelemetryPoint(
+  token: string,
+  sessionId: string,
+  point: CreateTelemetryPointInput
+): Promise<TelemetryPoint> {
+  const res = await fetch(`${API_URL}/sessions/${sessionId}/telemetry`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(point),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error("Create telemetry failed:", res.status, errorText);
+    throw new Error("Failed to create telemetry point");
+  }
+
+  return res.json();
+}

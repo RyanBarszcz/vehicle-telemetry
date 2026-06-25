@@ -59,7 +59,7 @@ export default function SessionPage() {
 
                 <SessionStats session={session} />
 
-                <SessionChart />
+                <SessionChart sessionId={session.id} />
             </div>
         </main>
     );

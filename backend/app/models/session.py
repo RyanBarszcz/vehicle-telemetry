@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
@@ -16,7 +16,7 @@ class DrivingSession(Base):
 
     title = Column(String, nullable=False)
 
-    started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    started_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     ended_at = Column(DateTime, nullable=True)
 
     duration_seconds = Column(Integer, nullable=False, default=0)
@@ -31,3 +31,4 @@ class DrivingSession(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     vehicle = relationship("Vehicle", back_populates="sessions")
+    telemetry_points = relationship("TelemetryPoint", back_populates="session", cascade="all, delete-orphan",)
