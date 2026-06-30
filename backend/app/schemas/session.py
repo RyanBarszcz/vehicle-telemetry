@@ -1,5 +1,7 @@
 from datetime import datetime
 from pydantic import BaseModel
+from typing import Optional
+
 
 
 class SessionCreate(BaseModel):
@@ -28,3 +30,10 @@ class SessionResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class SessionEndUpdate(BaseModel):
+    duration_seconds: int
+    distance_miles: Optional[float] = None
+    max_speed_mph: float
+    avg_speed_mph: Optional[float] = None
+    max_rpm: int

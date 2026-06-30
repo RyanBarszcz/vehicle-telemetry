@@ -1,8 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useAuth } from "@clerk/nextjs";
-import { toast } from "sonner";
 import {
     LineChart,
     Line,
@@ -13,88 +10,31 @@ import {
     ResponsiveContainer,
 } from "recharts";
 
-import {
-    createTelemetryPoint,
-    getSessionTelemetry,
-    type TelemetryPoint,
-} from "@/lib/api";
+import type { LiveTelemetryPoint } from "@/app/sessions/[sessionId]/page";
 
 type SessionChartProps = {
     sessionId: string;
+    points: LiveTelemetryPoint[];
+    currentPoint: LiveTelemetryPoint | null;
 };
 
-export default function SessionChart({ sessionId }: SessionChartProps) {
-    const { getToken } = useAuth();
-
-    const [points, setPoints] = useState<TelemetryPoint[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [adding, setAdding] = useState(false);
-
-    async function loadTelemetry() {
-        try {
-            setLoading(true);
-
-            const token = await getToken();
-
-            if (!token) {
-                return;
-            }
-
-            const data = await getSessionTelemetry(token, sessionId);
-            setPoints(data);
-        } catch (error) {
-            console.error(error);
-            toast.error("Failed to load telemetry");
-        } finally {
-            setLoading(false);
-        }
-    }
-
-    async function handleAddTestPoint() {
-        try {
-            setAdding(true);
-
-            const token = await getToken();
-
-            if (!token) {
-                toast.error("Please sign in.");
-                return;
-            }
-
-            await createTelemetryPoint(token, sessionId, {
-                timestamp: new Date().toISOString(),
-                rpm: Math.floor(1800 + Math.random() * 4500),
-                speed_mph: Math.floor(20 + Math.random() * 80),
-                throttle_percent: Math.floor(10 + Math.random() * 90),
-                coolant_temp_f: Math.floor(180 + Math.random() * 30),
-                intake_temp_f: Math.floor(70 + Math.random() * 40),
-                boost_psi: Number((Math.random() * 20).toFixed(1)),
-                fuel_level_percent: Math.floor(20 + Math.random() * 80),
-                battery_voltage: Number((12 + Math.random() * 2).toFixed(1)),
-            });
-
-            toast.success("Test point added");
-            await loadTelemetry();
-        } catch (error) {
-            console.error(error);
-            toast.error("Failed to add test point");
-        } finally {
-            setAdding(false);
-        }
-    }
-
-    useEffect(() => {
-        loadTelemetry();
-    }, [sessionId]);
-
-    const latest = points[points.length - 1];
+export default function SessionChart({
+    points,
+    currentPoint,
+}: SessionChartProps) {
+    const latest = currentPoint ?? points[points.length - 1];
 
     const chartData = points.map((point, index) => ({
         index: index + 1,
-        rpm: point.rpm,
+        time: new Date(point.timestamp).toLocaleTimeString([], {
+            minute: "2-digit",
+            second: "2-digit",
+        }),
         speed: point.speed_mph,
+        rpm: point.rpm,
         throttle: point.throttle_percent,
         coolant: point.coolant_temp_f,
+        boost: point.boost_psi ?? 0,
     }));
 
     return (
@@ -108,22 +48,12 @@ export default function SessionChart({ sessionId }: SessionChartProps) {
                         RPM, speed, throttle, and temperature points for this session.
                     </p>
                 </div>
-
-                <button
-                    onClick={handleAddTestPoint}
-                    disabled={adding}
-                    className="rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-50"
-                >
-                    {adding ? "Adding..." : "Add Test Point"}
-                </button>
             </div>
 
-            {loading ? (
-                <p className="text-sm text-zinc-400">Loading telemetry...</p>
-            ) : points.length === 0 ? (
+            {points.length === 0 ? (
                 <div className="rounded-2xl border border-white/10 bg-zinc-900/60 p-6 text-center">
                     <p className="text-sm text-zinc-400">
-                        No telemetry points yet. Add a test point to verify the pipeline.
+                        Waiting for live telemetry...
                     </p>
                 </div>
             ) : (
@@ -159,124 +89,87 @@ export default function SessionChart({ sessionId }: SessionChartProps) {
                     </div>
 
                     <div className="grid gap-6 xl:grid-cols-2">
-                        <div className="h-80 rounded-2xl border border-white/10 bg-zinc-900/70 p-4">
-                            <h3 className="mb-4 text-sm font-semibold text-white">
-                                RPM
-                            </h3>
+                        <ChartCard
+                            title="RPM"
+                            data={chartData}
+                            dataKey="rpm"
+                            stroke="#3b82f6"
+                        />
 
-                            <ResponsiveContainer width="100%" height="90%">
-                                <LineChart data={chartData}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="index" />
-                                    <YAxis />
-                                    <Tooltip
-                                        contentStyle={{
-                                            backgroundColor: "#09090b",
-                                            border: "1px solid rgba(255,255,255,0.1)",
-                                            borderRadius: "12px",
-                                        }}
-                                    />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="rpm"
-                                        stroke="#3b82f6"
-                                        strokeWidth={2}
-                                        dot={false}
-                                    />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </div>
+                        <ChartCard
+                            title="Speed"
+                            data={chartData}
+                            dataKey="speed"
+                            stroke="#22c55e"
+                        />
 
-                        <div className="h-80 rounded-2xl border border-white/10 bg-zinc-900/70 p-4">
-                            <h3 className="mb-4 text-sm font-semibold text-white">
-                                Speed
-                            </h3>
+                        <ChartCard
+                            title="Throttle"
+                            data={chartData}
+                            dataKey="throttle"
+                            stroke="#f59e0b"
+                        />
 
-                            <ResponsiveContainer width="100%" height="90%">
-                                <LineChart data={chartData}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="index" />
-                                    <YAxis />
-                                    <Tooltip
-                                        contentStyle={{
-                                            backgroundColor: "#09090b",
-                                            border: "1px solid rgba(255,255,255,0.1)",
-                                            borderRadius: "12px",
-                                        }}
-                                    />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="speed"
-                                        stroke="#22c55e"
-                                        strokeWidth={2}
-                                        dot={false}
-                                    />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </div>
-
-                        <div className="h-80 rounded-2xl border border-white/10 bg-zinc-900/70 p-4">
-                            <h3 className="mb-4 text-sm font-semibold text-white">
-                                Throttle
-                            </h3>
-
-                            <ResponsiveContainer width="100%" height="90%">
-                                <LineChart data={chartData}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="index" />
-                                    <YAxis />
-                                    <Tooltip
-                                        contentStyle={{
-                                            backgroundColor: "#09090b",
-                                            border: "1px solid rgba(255,255,255,0.1)",
-                                            borderRadius: "12px",
-                                        }}
-                                    />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="throttle"
-                                        stroke="#f59e0b"
-                                        strokeWidth={2}
-                                        dot={false}
-                                    />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </div>
-
-                        <div className="h-80 rounded-2xl border border-white/10 bg-zinc-900/70 p-4">
-                            <h3 className="mb-4 text-sm font-semibold text-white">
-                                Coolant Temp
-                            </h3>
-
-                            <ResponsiveContainer width="100%" height="90%">
-                                <LineChart data={chartData}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="index" />
-                                    <YAxis />
-                                    <Tooltip
-                                        contentStyle={{
-                                            backgroundColor: "#09090b",
-                                            border: "1px solid rgba(255,255,255,0.1)",
-                                            borderRadius: "12px",
-                                        }}
-                                    />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="coolant"
-                                        stroke="#ef4444"
-                                        strokeWidth={2}
-                                        dot={false}
-                                    />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </div>
+                        <ChartCard
+                            title="Coolant Temp"
+                            data={chartData}
+                            dataKey="coolant"
+                            stroke="#ef4444"
+                        />
                     </div>
 
                     <p className="text-xs text-zinc-500">
-                        Showing last {Math.min(points.length, 40)} telemetry points by RPM.
+                        Showing last {Math.min(points.length, 60)} telemetry points.
                     </p>
                 </div>
             )}
         </section>
+    );
+}
+
+type ChartDataPoint = {
+    index: number;
+    time: string;
+    speed: number;
+    rpm: number;
+    throttle: number;
+    coolant: number;
+    boost: number;
+};
+
+type ChartCardProps = {
+    title: string;
+    data: ChartDataPoint[];
+    dataKey: "rpm" | "speed" | "throttle" | "coolant";
+    stroke: string;
+};
+
+function ChartCard({ title, data, dataKey, stroke }: ChartCardProps) {
+    return (
+        <div className="h-80 rounded-2xl border border-white/10 bg-zinc-900/70 p-4">
+            <h3 className="mb-4 text-sm font-semibold text-white">{title}</h3>
+
+            <ResponsiveContainer width="100%" height="90%">
+                <LineChart data={data}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="time" />
+                    <YAxis />
+                    <Tooltip
+                        contentStyle={{
+                            backgroundColor: "#09090b",
+                            border: "1px solid rgba(255,255,255,0.1)",
+                            borderRadius: "12px",
+                        }}
+                    />
+                    <Line
+                        type="monotone"
+                        dataKey={dataKey}
+                        stroke={stroke}
+                        strokeWidth={2}
+                        dot={false}
+                    />
+                </LineChart>
+            </ResponsiveContainer>
+        </div>
     );
 }

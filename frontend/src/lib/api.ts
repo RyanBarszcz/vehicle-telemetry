@@ -1,4 +1,5 @@
 import type { Vehicle } from "@/types/vehicle";
+import type { LocalTelemetryPoint } from "@/lib/localTelemetryDb";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -246,4 +247,54 @@ export async function createTelemetryPoint(
   }
 
   return res.json();
+}
+
+export type EndSessionInput = {
+    duration_seconds: number;
+    distance_miles: number;
+    max_speed_mph: number;
+    avg_speed_mph: number;
+    max_rpm: number;
+};
+
+export async function endSession(
+    token: string,
+    sessionId: string,
+    data: EndSessionInput
+): Promise<DrivingSession> {
+    const res = await fetch(`${API_URL}/sessions/${sessionId}/end`, {
+        method: "PATCH",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+    });
+
+    if (!res.ok) {
+        throw new Error("Failed to end session");
+    }
+
+    return res.json();
+}
+
+export async function createTelemetryBatch(
+    token: string,
+    sessionId: string,
+    points: LocalTelemetryPoint[]
+) {
+    const res = await fetch(`${API_URL}/sessions/${sessionId}/telemetry/batch`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ points }),
+    });
+
+    if (!res.ok) {
+        throw new Error("Failed to upload telemetry batch");
+    }
+
+    return res.json();
 }

@@ -3,6 +3,9 @@ from pydantic import BaseModel
 
 
 class TelemetryPointCreate(BaseModel):
+    id: str
+    sessionId: str
+
     timestamp: datetime | None = None
 
     rpm: int
@@ -14,6 +17,10 @@ class TelemetryPointCreate(BaseModel):
     boost_psi: float | None = None
     fuel_level_percent: float | None = None
     battery_voltage: float | None = None
+
+
+class TelemetryBatchCreate(BaseModel):
+    points: list[TelemetryPointCreate]
 
 
 class TelemetryPointResponse(BaseModel):
