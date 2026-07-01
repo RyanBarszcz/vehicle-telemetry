@@ -44,6 +44,23 @@ def get_owned_vehicle(db: Session, user_id: str, vehicle_id: str) -> Vehicle:
 
     return vehicle
 
+@router.get("/sessions")
+def get_user_sessions(
+    db: Session = Depends(get_db),
+    clerk_user_id: str = Depends(get_clerk_user_id),
+):
+    user = get_db_user(db, clerk_user_id)
+
+    sessions = (
+        db.query(DrivingSession)
+        .join(GarageVehicle, GarageVehicle.vehicle_id == DrivingSession.vehicle_id)
+        .filter(GarageVehicle.user_id == user.id)
+        .order_by(DrivingSession.started_at.desc())
+        .all()
+    )
+
+    return sessions
+
 
 @router.get(
     "/vehicles/{vehicle_id}/sessions",

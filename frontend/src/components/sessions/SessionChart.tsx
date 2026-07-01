@@ -18,6 +18,8 @@ type SessionChartProps = {
     currentPoint: LiveTelemetryPoint | null;
 };
 
+// TODO: Make this work when loading old sessions
+
 export default function SessionChart({
     points,
     currentPoint,

@@ -91,20 +91,6 @@ export async function getVehicle(
   return res.json();
 }
 
-export type DrivingSession = {
-  id: string;
-  vehicle_id: string;
-  title: string;
-  started_at: string;
-  ended_at: string | null;
-  duration_seconds: number;
-  distance_miles: number | null;
-  max_speed_mph: number;
-  avg_speed_mph: number | null;
-  max_rpm: number;
-  created_at: string;
-};
-
 export type CreateSessionInput = {
   title: string;
   started_at?: string;
@@ -336,6 +322,35 @@ export async function getDashboardSummary(
 
     if (!res.ok) {
         throw new Error("Failed to fetch dashboard summary");
+    }
+
+    return res.json();
+}
+
+export type DrivingSession = {
+    id: string;
+    vehicle_id: string;
+    title: string | null;
+    started_at: string;
+    ended_at: string | null;
+    duration_seconds: number;
+    distance_miles: number | null;
+    max_speed_mph: number;
+    avg_speed_mph: number | null;
+    max_rpm: number;
+    created_at: string;
+};
+
+export async function getSessions(token: string): Promise<DrivingSession[]> {
+    const res = await fetch(`${API_URL}/sessions`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+        cache: "no-store",
+    });
+
+    if (!res.ok) {
+        throw new Error("Failed to fetch sessions");
     }
 
     return res.json();
