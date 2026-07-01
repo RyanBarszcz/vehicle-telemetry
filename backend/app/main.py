@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.routes import auth, sessions, telemetry, vehicles
+from app.routes import auth, dashboard, sessions, telemetry, vehicles
 
 app = FastAPI(title="Vehicle Telemetry API")
 
@@ -20,6 +20,7 @@ app.include_router(auth.router)
 app.include_router(vehicles.router)
 app.include_router(sessions.router)
 app.include_router(telemetry.router)
+app.include_router(dashboard.router)
 
 @app.get("/")
 def root():

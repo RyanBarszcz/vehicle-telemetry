@@ -298,3 +298,45 @@ export async function createTelemetryBatch(
 
     return res.json();
 }
+
+export type DashboardVehicleSummary = {
+    id: string;
+    name: string;
+    year: number | null;
+    make: string;
+    model: string;
+};
+
+export type DashboardSessionSummary = {
+    id: string;
+    title: string;
+    vehicle_name: string;
+    duration_seconds: number;
+    distance_miles: number | null;
+    max_speed_mph: number;
+};
+
+export type DashboardSummary = {
+    vehicle_count: number;
+    session_count: number;
+    miles_logged: number;
+    active_alert_count: number;
+    vehicles: DashboardVehicleSummary[];
+    recent_sessions: DashboardSessionSummary[];
+};
+
+export async function getDashboardSummary(
+    token: string
+): Promise<DashboardSummary> {
+    const res = await fetch(`${API_URL}/dashboard`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+
+    if (!res.ok) {
+        throw new Error("Failed to fetch dashboard summary");
+    }
+
+    return res.json();
+}
