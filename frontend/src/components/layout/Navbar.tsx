@@ -21,10 +21,6 @@ export default function Navbar() {
                         Garage
                     </Link>
 
-                    <Link href="/live" className="text-sm font-medium text-zinc-300 hover:text-white">
-                        Live
-                    </Link>
-
                     <Link href="/sessions" className="text-sm font-medium text-zinc-300 hover:text-white">
                         Sessions
                     </Link>

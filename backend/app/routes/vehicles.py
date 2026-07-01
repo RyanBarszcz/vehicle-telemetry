@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func
+from app.models.session import DrivingSession
 
 from app.database import get_db
 from app.models.user import User
@@ -26,15 +28,42 @@ def get_vehicles(
 ):
     user = get_db_user(db, clerk_user_id)
 
-    vehicles = (
-        db.query(Vehicle)
+    rows = (
+        db.query(
+            Vehicle,
+            func.count(DrivingSession.id).label("session_count"),
+            func.max(DrivingSession.started_at).label("last_session_at"),
+            func.max(DrivingSession.max_rpm).label("max_rpm"),
+            func.max(DrivingSession.max_speed_mph).label("max_speed_mph"),
+            func.coalesce(func.sum(DrivingSession.distance_miles), 0).label(
+                "total_distance_miles"
+            ),
+        )
         .join(GarageVehicle, GarageVehicle.vehicle_id == Vehicle.id)
+        .outerjoin(DrivingSession, DrivingSession.vehicle_id == Vehicle.id)
         .filter(GarageVehicle.user_id == user.id)
+        .group_by(Vehicle.id)
         .all()
     )
 
-    return vehicles
-
+    return [
+        {
+            **vehicle.__dict__,
+            "session_count": session_count,
+            "last_session_at": last_session_at,
+            "max_rpm": max_rpm,
+            "max_speed_mph": max_speed_mph,
+            "total_distance_miles": total_distance_miles,
+        }
+        for (
+            vehicle,
+            session_count,
+            last_session_at,
+            max_rpm,
+            max_speed_mph,
+            total_distance_miles,
+        ) in rows
+    ]
 
 @router.post("/", response_model=VehicleResponse)
 def create_vehicle(

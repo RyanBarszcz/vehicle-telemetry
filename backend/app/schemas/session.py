@@ -32,8 +32,9 @@ class SessionResponse(BaseModel):
         from_attributes = True
 
 class SessionEndUpdate(BaseModel):
+    title: str | None = None
     duration_seconds: int
-    distance_miles: Optional[float] = None
+    distance_miles: float | None = None
     max_speed_mph: float
-    avg_speed_mph: Optional[float] = None
+    avg_speed_mph: float | None = None
     max_rpm: int

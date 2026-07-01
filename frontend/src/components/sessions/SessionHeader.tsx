@@ -10,7 +10,7 @@ type SessionHeaderProps = {
     session: DrivingSession;
     liveStats: LiveSessionStats;
     currentPoint: LiveTelemetryPoint | null;
-    onEndSession: () => Promise<void>;
+    onEndSession: () => void;
 };
 
 export default function SessionHeader({

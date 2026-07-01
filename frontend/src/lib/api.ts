@@ -236,10 +236,11 @@ export async function createTelemetryPoint(
 }
 
 export type EndSessionInput = {
+    title?: string;
     duration_seconds: number;
-    distance_miles: number;
+    distance_miles?: number | null;
     max_speed_mph: number;
-    avg_speed_mph: number;
+    avg_speed_mph?: number | null;
     max_rpm: number;
 };
 

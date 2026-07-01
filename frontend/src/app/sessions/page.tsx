@@ -25,6 +25,10 @@ function formatDuration(seconds: number) {
     return `${minutes}m`;
 }
 
+// TODO: Make duration be seconds and minutes too
+// TODO: Add a delete option
+
+
 export default async function SessionsPage() {
     const { userId, getToken } = await auth();
 

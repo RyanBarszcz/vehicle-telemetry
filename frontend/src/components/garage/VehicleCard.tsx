@@ -49,19 +49,27 @@ export default function VehicleCard({ vehicle }: VehicleCardProps) {
                 <div className="rounded-2xl bg-zinc-900/70 p-4">
                     <Activity className="mb-2 h-4 w-4 text-blue-400" />
                     <p className="text-xs text-zinc-500">Sessions</p>
-                    <p className="mt-1 font-semibold text-white">0</p>
+                    <p className="mt-1 font-semibold text-white">
+                        {vehicle.session_count ?? 0}
+                    </p>
                 </div>
 
                 <div className="rounded-2xl bg-zinc-900/70 p-4">
                     <Radio className="mb-2 h-4 w-4 text-blue-400" />
-                    <p className="text-xs text-zinc-500">Last Sync</p>
-                    <p className="mt-1 font-semibold text-white">Never</p>
+                    <p className="text-xs text-zinc-500">Last Session</p>
+                    <p className="mt-1 font-semibold text-white">
+                        {vehicle.last_session_at
+                            ? new Date(vehicle.last_session_at).toLocaleDateString()
+                            : "Never"}
+                    </p>
                 </div>
 
                 <div className="rounded-2xl bg-zinc-900/70 p-4">
                     <Gauge className="mb-2 h-4 w-4 text-blue-400" />
                     <p className="text-xs text-zinc-500">Max RPM</p>
-                    <p className="mt-1 font-semibold text-white">—</p>
+                    <p className="mt-1 font-semibold text-white">
+                        {vehicle.max_rpm ? vehicle.max_rpm.toLocaleString() : "—"}
+                    </p>
                 </div>
             </div>
         </Link>

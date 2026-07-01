@@ -9,35 +9,81 @@ import {
     Tooltip,
     ResponsiveContainer,
 } from "recharts";
+import {
+    DndContext,
+    closestCenter,
+    type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+    SortableContext,
+    arrayMove,
+    useSortable,
+    rectSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical } from "lucide-react";
 
 import type { LiveTelemetryPoint } from "@/app/sessions/[sessionId]/page";
+import {
+    telemetryMetrics,
+    type TelemetryMetricKey,
+} from "@/lib/telemetryMetrics";
 
 type SessionChartProps = {
     sessionId: string;
     points: LiveTelemetryPoint[];
     currentPoint: LiveTelemetryPoint | null;
+    trackedMetrics: TelemetryMetricKey[];
+    onReorderMetrics: (metrics: TelemetryMetricKey[]) => void;
+};
+
+type ChartDataPoint = {
+    index: number;
+    time: string;
+    speed_mph: number;
+    rpm: number;
+    throttle_percent: number;
+    coolant_temp_f: number;
+    boost_psi: number;
 };
 
 // TODO: Make this work when loading old sessions
+// TODO: Make the duration work with seconds too
+// TODO: Graphs look weird when the keep growing.
+//       - Work on x-axis and how graphs look
+
 
 export default function SessionChart({
     points,
     currentPoint,
+    trackedMetrics,
+    onReorderMetrics,
 }: SessionChartProps) {
     const latest = currentPoint ?? points[points.length - 1];
 
-    const chartData = points.map((point, index) => ({
+    const chartData: ChartDataPoint[] = points.map((point, index) => ({
         index: index + 1,
         time: new Date(point.timestamp).toLocaleTimeString([], {
             minute: "2-digit",
             second: "2-digit",
         }),
-        speed: point.speed_mph,
+        speed_mph: point.speed_mph,
         rpm: point.rpm,
-        throttle: point.throttle_percent,
-        coolant: point.coolant_temp_f,
-        boost: point.boost_psi ?? 0,
+        throttle_percent: point.throttle_percent,
+        coolant_temp_f: point.coolant_temp_f,
+        boost_psi: point.boost_psi ?? 0,
     }));
+
+    function handleDragEnd(event: DragEndEvent) {
+        const { active, over } = event;
+
+        if (!over || active.id === over.id) return;
+
+        const oldIndex = trackedMetrics.indexOf(active.id as TelemetryMetricKey);
+        const newIndex = trackedMetrics.indexOf(over.id as TelemetryMetricKey);
+
+        onReorderMetrics(arrayMove(trackedMetrics, oldIndex, newIndex));
+    }
 
     return (
         <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
@@ -47,7 +93,8 @@ export default function SessionChart({
                         Telemetry Data
                     </h2>
                     <p className="mt-1 text-sm text-zinc-400">
-                        RPM, speed, throttle, and temperature points for this session.
+                        Showing only the metrics selected for this session. Drag charts to
+                        organize your dashboard.
                     </p>
                 </div>
             </div>
@@ -68,57 +115,45 @@ export default function SessionChart({
                             </p>
                         </div>
 
-                        <div className="rounded-2xl bg-zinc-900/70 p-4">
-                            <p className="text-xs text-zinc-500">Latest RPM</p>
-                            <p className="mt-1 text-xl font-semibold text-white">
-                                {latest?.rpm.toLocaleString()}
-                            </p>
-                        </div>
+                        {trackedMetrics.slice(0, 3).map((metricKey) => {
+                            const metric = telemetryMetrics[metricKey];
+                            const value = latest?.[metricKey];
 
-                        <div className="rounded-2xl bg-zinc-900/70 p-4">
-                            <p className="text-xs text-zinc-500">Latest Speed</p>
-                            <p className="mt-1 text-xl font-semibold text-white">
-                                {latest?.speed_mph} mph
-                            </p>
-                        </div>
-
-                        <div className="rounded-2xl bg-zinc-900/70 p-4">
-                            <p className="text-xs text-zinc-500">Coolant</p>
-                            <p className="mt-1 text-xl font-semibold text-white">
-                                {latest?.coolant_temp_f}°F
-                            </p>
-                        </div>
+                            return (
+                                <div
+                                    key={metricKey}
+                                    className="rounded-2xl bg-zinc-900/70 p-4"
+                                >
+                                    <p className="text-xs text-zinc-500">
+                                        Latest {metric.label}
+                                    </p>
+                                    <p className="mt-1 text-xl font-semibold text-white">
+                                        {formatMetricValue(value, metric.unit)}
+                                    </p>
+                                </div>
+                            );
+                        })}
                     </div>
 
-                    <div className="grid gap-6 xl:grid-cols-2">
-                        <ChartCard
-                            title="RPM"
-                            data={chartData}
-                            dataKey="rpm"
-                            stroke="#3b82f6"
-                        />
-
-                        <ChartCard
-                            title="Speed"
-                            data={chartData}
-                            dataKey="speed"
-                            stroke="#22c55e"
-                        />
-
-                        <ChartCard
-                            title="Throttle"
-                            data={chartData}
-                            dataKey="throttle"
-                            stroke="#f59e0b"
-                        />
-
-                        <ChartCard
-                            title="Coolant Temp"
-                            data={chartData}
-                            dataKey="coolant"
-                            stroke="#ef4444"
-                        />
-                    </div>
+                    <DndContext
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleDragEnd}
+                    >
+                        <SortableContext
+                            items={trackedMetrics}
+                            strategy={rectSortingStrategy}
+                        >
+                            <div className="grid gap-6 xl:grid-cols-2">
+                                {trackedMetrics.map((metricKey) => (
+                                    <SortableChartCard
+                                        key={metricKey}
+                                        metricKey={metricKey}
+                                        data={chartData}
+                                    />
+                                ))}
+                            </div>
+                        </SortableContext>
+                    </DndContext>
 
                     <p className="text-xs text-zinc-500">
                         Showing last {Math.min(points.length, 60)} telemetry points.
@@ -129,49 +164,112 @@ export default function SessionChart({
     );
 }
 
-type ChartDataPoint = {
-    index: number;
-    time: string;
-    speed: number;
-    rpm: number;
-    throttle: number;
-    coolant: number;
-    boost: number;
-};
-
-type ChartCardProps = {
-    title: string;
+type SortableChartCardProps = {
+    metricKey: TelemetryMetricKey;
     data: ChartDataPoint[];
-    dataKey: "rpm" | "speed" | "throttle" | "coolant";
-    stroke: string;
 };
 
-function ChartCard({ title, data, dataKey, stroke }: ChartCardProps) {
-    return (
-        <div className="h-80 rounded-2xl border border-white/10 bg-zinc-900/70 p-4">
-            <h3 className="mb-4 text-sm font-semibold text-white">{title}</h3>
+function SortableChartCard({ metricKey, data }: SortableChartCardProps) {
+    const metric = telemetryMetrics[metricKey];
 
-            <ResponsiveContainer width="100%" height="90%">
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: metricKey });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+    };
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            className={`h-80 rounded-2xl border border-white/10 bg-zinc-900/70 p-4 transition ${isDragging ? "scale-[1.02] border-blue-500/50 opacity-80" : ""
+                }`}
+        >
+            <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                    <h3 className="text-sm font-semibold text-white">
+                        {metric.label}
+                    </h3>
+                    <p className="text-xs text-zinc-500">{metric.unit}</p>
+                </div>
+
+                <button
+                    type="button"
+                    {...attributes}
+                    {...listeners}
+                    className="cursor-grab rounded-lg p-2 text-zinc-500 transition hover:bg-white/10 hover:text-white active:cursor-grabbing"
+                >
+                    <GripVertical className="h-4 w-4" />
+                </button>
+            </div>
+
+            <ResponsiveContainer width="100%" height="82%">
                 <LineChart data={data}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="time" />
-                    <YAxis />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                    <XAxis
+                        dataKey="time"
+                        tick={{ fill: "#71717a", fontSize: 12 }}
+                        axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+                        tickLine={false}
+                    />
+                    <YAxis
+                        tick={{ fill: "#71717a", fontSize: 12 }}
+                        axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+                        tickLine={false}
+                    />
                     <Tooltip
                         contentStyle={{
                             backgroundColor: "#09090b",
                             border: "1px solid rgba(255,255,255,0.1)",
                             borderRadius: "12px",
+                            color: "#fff",
                         }}
+                        labelStyle={{ color: "#a1a1aa" }}
                     />
                     <Line
                         type="monotone"
-                        dataKey={dataKey}
-                        stroke={stroke}
+                        dataKey={metricKey}
+                        stroke="#3b82f6"
                         strokeWidth={2}
                         dot={false}
+                        name={metric.label}
                     />
                 </LineChart>
             </ResponsiveContainer>
         </div>
     );
+}
+
+function formatMetricValue(value: number | null | undefined, unit: string) {
+    if (value === null || value === undefined) return "—";
+
+    if (unit === "rpm") {
+        return `${Math.round(value).toLocaleString()} rpm`;
+    }
+
+    if (unit === "%") {
+        return `${Math.round(value)}%`;
+    }
+
+    if (unit === "°F") {
+        return `${Math.round(value)}°F`;
+    }
+
+    if (unit === "mph") {
+        return `${Math.round(value)} mph`;
+    }
+
+    if (unit === "psi") {
+        return `${Number(value).toFixed(1)} psi`;
+    }
+
+    return `${value} ${unit}`;
 }

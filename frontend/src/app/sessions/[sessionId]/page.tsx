@@ -8,12 +8,18 @@ import { toast } from "sonner";
 import SessionHeader from "@/components/sessions/SessionHeader";
 import SessionStats from "@/components/sessions/SessionStats";
 import SessionChart from "@/components/sessions/SessionChart";
+import EndSessionModal from "@/components/sessions/EndSessionModal";
 import {
     createTelemetryBatch,
     endSession,
     getSession,
     type DrivingSession,
 } from "@/lib/api";
+import TrackingOptionsModal from "@/components/sessions/TrackingOptionsModal";
+import {
+    defaultTrackedMetrics,
+    type TelemetryMetricKey,
+} from "@/lib/telemetryMetrics";
 import {
     deleteLocalTelemetryPoints,
     getLocalTelemetryPoints,
@@ -49,6 +55,14 @@ export default function SessionPage() {
     const [session, setSession] = useState<DrivingSession | null>(null);
     const [loading, setLoading] = useState(true);
     const [missing, setMissing] = useState(false);
+
+    const [trackingConfirmed, setTrackingConfirmed] = useState(false);
+    const [trackedMetrics, setTrackedMetrics] =
+        useState<TelemetryMetricKey[]>(defaultTrackedMetrics);
+
+    const [showEndModal, setShowEndModal] = useState(false);
+    const [savingEnd, setSavingEnd] = useState(false);
+    const [captureStopped, setCaptureStopped] = useState(false);
 
     const [currentPoint, setCurrentPoint] =
         useState<LiveTelemetryPoint | null>(null);
@@ -129,10 +143,18 @@ export default function SessionPage() {
         }
     }
 
-    async function handleEndSession() {
+    function handleEndSession() {
         if (!session || !liveStats) return;
 
-        const toastId = toast.loading("Ending session...");
+        setCaptureStopped(true);
+        setShowEndModal(true);
+    }
+
+    async function handleSaveEndedSession(title: string) {
+        if (!session || !liveStats) return;
+
+        const toastId = toast.loading("Saving session...");
+        setSavingEnd(true);
 
         try {
             const token = await getToken();
@@ -149,6 +171,7 @@ export default function SessionPage() {
             }
 
             const updatedSession = await endSession(token, session.id, {
+                title,
                 duration_seconds: liveStats.duration_seconds,
                 distance_miles: liveStats.distance_miles,
                 max_speed_mph: liveStats.max_speed_mph,
@@ -159,18 +182,21 @@ export default function SessionPage() {
             await deleteLocalTelemetryPoints(session.id);
 
             setSession(updatedSession);
+            setShowEndModal(false);
 
-            toast.success("Session ended", { id: toastId });
+            toast.success("Session saved", { id: toastId });
             router.push("/sessions");
             router.refresh();
         } catch (error) {
             console.error(error);
             toast.error("Session saved locally. Sync failed.", { id: toastId });
+        } finally {
+            setSavingEnd(false);
         }
     }
 
     useEffect(() => {
-        if (!session || session.ended_at) return;
+        if (!session || session.ended_at || captureStopped || !trackingConfirmed) return;
 
         const interval = window.setInterval(() => {
             const point: LiveTelemetryPoint = {
@@ -188,7 +214,7 @@ export default function SessionPage() {
         }, 1000);
 
         return () => window.clearInterval(interval);
-    }, [session]);
+    }, [session, captureStopped, trackingConfirmed]);
 
     if (loading) {
         return (
@@ -218,7 +244,35 @@ export default function SessionPage() {
                     sessionId={session.id}
                     points={telemetryPoints}
                     currentPoint={currentPoint}
+                    trackedMetrics={trackedMetrics}
+                    onReorderMetrics={setTrackedMetrics}
                 />
+
+                {!trackingConfirmed && !session.ended_at && (
+                    <TrackingOptionsModal
+                        onConfirm={(metrics) => {
+                            setTrackedMetrics(metrics);
+                            setTrackingConfirmed(true);
+                        }}
+                    />
+                )}
+
+                {showEndModal && (
+                    <EndSessionModal
+                        defaultTitle={session.title}
+                        durationSeconds={liveStats.duration_seconds}
+                        distanceMiles={liveStats.distance_miles}
+                        maxSpeedMph={liveStats.max_speed_mph}
+                        avgSpeedMph={liveStats.avg_speed_mph}
+                        maxRpm={liveStats.max_rpm}
+                        saving={savingEnd}
+                        onCancel={() => {
+                            setShowEndModal(false);
+                            setCaptureStopped(false);
+                        }}
+                        onSave={handleSaveEndedSession}
+                    />
+                )}
             </div>
         </main>
     );

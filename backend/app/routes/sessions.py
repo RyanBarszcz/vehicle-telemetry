@@ -166,6 +166,9 @@ def end_session(
 
     session.ended_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
+    if data.title is not None:
+        session.title = data.title.strip() or None
+
     session.duration_seconds = data.duration_seconds
     session.distance_miles = data.distance_miles
     session.max_speed_mph = data.max_speed_mph
