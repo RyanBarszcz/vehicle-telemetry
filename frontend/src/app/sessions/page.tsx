@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { CalendarDays, Gauge, Timer, Route, ArrowRight } from "lucide-react";
+import { formatDuration } from "@/lib/formatters";
 
 import { getSessions } from "@/lib/api";
 
@@ -11,18 +12,6 @@ function formatDate(date: string) {
         day: "numeric",
         year: "numeric",
     }).format(new Date(date));
-}
-
-function formatDuration(seconds: number) {
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-
-    if (hours > 0) {
-        return `${hours}h ${remainingMinutes}m`;
-    }
-
-    return `${minutes}m`;
 }
 
 // TODO: Make duration be seconds and minutes too

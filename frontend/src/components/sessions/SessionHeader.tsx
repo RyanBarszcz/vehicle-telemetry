@@ -1,16 +1,14 @@
 "use client";
 
 import type { DrivingSession } from "@/lib/api";
-import type {
-    LiveSessionStats,
-    LiveTelemetryPoint,
-} from "@/app/sessions/[sessionId]/page";
+import type { LiveSessionStats, LiveTelemetryPoint } from "@/types/telemetry";
+import { formatDuration } from "@/lib/formatters";
 
 type SessionHeaderProps = {
     session: DrivingSession;
     liveStats: LiveSessionStats;
     currentPoint: LiveTelemetryPoint | null;
-    onEndSession: () => void;
+    onEndSession?: () => void;
 };
 
 export default function SessionHeader({
@@ -19,7 +17,6 @@ export default function SessionHeader({
     currentPoint,
     onEndSession,
 }: SessionHeaderProps) {
-    const durationMinutes = Math.floor(liveStats.duration_seconds / 60);
     const isActive = !session.ended_at;
 
     return (
@@ -27,9 +24,7 @@ export default function SessionHeader({
             <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
                 <div>
                     <div className="flex items-center gap-3">
-                        <h1 className="text-2xl font-bold text-white">
-                            {session.title}
-                        </h1>
+                        <h1 className="text-2xl font-bold text-white">{session.title}</h1>
 
                         <span
                             className={`rounded-full px-3 py-1 text-xs font-medium ${isActive
@@ -43,18 +38,18 @@ export default function SessionHeader({
 
                     <p className="mt-1 text-sm text-zinc-400">
                         {new Date(session.started_at).toLocaleDateString()} •{" "}
-                        {durationMinutes} Minutes
+                        {formatDuration(liveStats.duration_seconds)}
                     </p>
 
                     {currentPoint && (
                         <p className="mt-2 text-sm text-zinc-300">
-                            Live: {currentPoint.speed_mph} mph •{" "}
+                            {isActive ? "Live" : "Final"}: {currentPoint.speed_mph} mph •{" "}
                             {currentPoint.rpm.toLocaleString()} RPM
                         </p>
                     )}
                 </div>
 
-                {isActive && (
+                {isActive && onEndSession && (
                     <button
                         onClick={onEndSession}
                         className="rounded-full bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-500"

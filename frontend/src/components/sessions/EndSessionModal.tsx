@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { X, Save } from "lucide-react";
+import { formatDuration } from "@/lib/formatters";
 
 type EndSessionModalProps = {
     defaultTitle?: string | null;
@@ -14,15 +15,6 @@ type EndSessionModalProps = {
     onCancel: () => void;
     onSave: (title: string) => void;
 };
-
-function formatDuration(seconds: number) {
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-
-    if (hours > 0) return `${hours}h ${remainingMinutes}m`;
-    return `${minutes}m`;
-}
 
 export default function EndSessionModal({
     defaultTitle,

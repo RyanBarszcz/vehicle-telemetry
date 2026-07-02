@@ -1,5 +1,6 @@
 import type { Vehicle } from "@/types/vehicle";
 import type { LocalTelemetryPoint } from "@/lib/localTelemetryDb";
+import type { LiveTelemetryPoint } from "@/types/telemetry";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -196,7 +197,7 @@ export type CreateTelemetryPointInput = {
 export async function getSessionTelemetry(
   token: string,
   sessionId: string
-): Promise<TelemetryPoint[]> {
+): Promise<LiveTelemetryPoint[]> {
   const res = await fetch(`${API_URL}/sessions/${sessionId}/telemetry`, {
     headers: {
       Authorization: `Bearer ${token}`,

@@ -2,7 +2,8 @@ import { Activity, Gauge, Route, Timer } from "lucide-react";
 
 import MetricCard from "@/components/telemetry/MetricCard";
 import type { DrivingSession } from "@/lib/api";
-import type { LiveSessionStats } from "@/app/sessions/[sessionId]/page";
+import type { LiveSessionStats } from "@/types/telemetry";
+import { formatDuration } from "@/lib/formatters";
 
 type SessionStatsProps = {
     session: DrivingSession;
@@ -10,13 +11,11 @@ type SessionStatsProps = {
 };
 
 export default function SessionStats({ liveStats }: SessionStatsProps) {
-    const durationMinutes = Math.floor(liveStats.duration_seconds / 60);
-
     return (
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard
                 label="Duration"
-                value={`${durationMinutes} min`}
+                value={formatDuration(liveStats.duration_seconds)}
                 icon={<Timer />}
             />
 
