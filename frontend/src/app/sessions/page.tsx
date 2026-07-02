@@ -14,7 +14,6 @@ function formatDate(date: string) {
     }).format(new Date(date));
 }
 
-// TODO: Make duration be seconds and minutes too
 // TODO: Add a delete option
 
 

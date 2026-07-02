@@ -23,7 +23,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 
-import type { LiveTelemetryPoint } from "@/app/sessions/[sessionId]/page";
+import type { LiveTelemetryPoint } from "@/types/telemetry";
 import {
     telemetryMetrics,
     type TelemetryMetricKey,
@@ -47,8 +47,6 @@ type ChartDataPoint = {
     boost_psi: number;
 };
 
-// TODO: Make this work when loading old sessions
-// TODO: Make the duration work with seconds too
 // TODO: Graphs look weird when the keep growing.
 //       - Work on x-axis and how graphs look
 
@@ -61,8 +59,10 @@ export default function SessionChart({
 }: SessionChartProps) {
     const latest = currentPoint ?? points[points.length - 1];
 
-    const chartData: ChartDataPoint[] = points.map((point, index) => ({
-        index: index + 1,
+    const visiblePoints = points.slice(-20);
+
+    const chartData: ChartDataPoint[] = visiblePoints.map((point, index) => ({
+        index: points.length - visiblePoints.length + index + 1,
         time: new Date(point.timestamp).toLocaleTimeString([], {
             minute: "2-digit",
             second: "2-digit",
@@ -219,6 +219,7 @@ function SortableChartCard({ metricKey, data }: SortableChartCardProps) {
                         tick={{ fill: "#71717a", fontSize: 12 }}
                         axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
                         tickLine={false}
+                        tickCount={6}
                     />
                     <YAxis
                         tick={{ fill: "#71717a", fontSize: 12 }}
@@ -241,6 +242,7 @@ function SortableChartCard({ metricKey, data }: SortableChartCardProps) {
                         strokeWidth={2}
                         dot={false}
                         name={metric.label}
+                        isAnimationActive={false}
                     />
                 </LineChart>
             </ResponsiveContainer>
