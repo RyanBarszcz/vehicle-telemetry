@@ -47,10 +47,6 @@ type ChartDataPoint = {
     boost_psi: number;
 };
 
-// TODO: Graphs look weird when the keep growing.
-//       - Work on x-axis and how graphs look
-
-
 export default function SessionChart({
     points,
     currentPoint,
