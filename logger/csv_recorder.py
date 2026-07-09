@@ -5,15 +5,18 @@ from pathlib import Path
 from telemetry import TelemetryPoint
 
 
-FIELDS = [
-    "timestamp",
-    "rpm",
-    "throttle_percent",
-]
-
-
 class CsvRecorder:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        selected_metrics: list[str],
+        session_id: str | None = None,
+        vehicle_id: str | None = None,
+    ) -> None:
+        
+        self.fields = ["timestamp", *selected_metrics]
+        self.session_id = session_id
+        self.vehicle_id = vehicle_id
+
         self.runs_dir = Path("runs")
         self.active_dir = self.runs_dir / "active"
         self.completed_dir = self.runs_dir / "completed"
@@ -27,7 +30,7 @@ class CsvRecorder:
 
     def start(self) -> None:
         self.file = self.active_file.open("w", newline="")
-        self.writer = csv.DictWriter(self.file, fieldnames=FIELDS)
+        self.writer = csv.DictWriter(self.file, fieldnames=self.fields)
         self.writer.writeheader()
         self.file.flush()
 
@@ -42,9 +45,14 @@ class CsvRecorder:
         if self.file is not None:
             self.file.close()
 
-        finished_name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S_gti.csv")
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+        if self.session_id:
+            finished_name = f"session_{self.session_id}_{timestamp}.csv"
+        else:
+            finished_name = f"{timestamp}_gti.csv"
+
         finished_file = self.completed_dir / finished_name
 
         self.active_file.rename(finished_file)
-
         return finished_file

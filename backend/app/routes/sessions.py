@@ -98,7 +98,8 @@ def create_vehicle_session(
     session = DrivingSession(
         vehicle_id=vehicle_id,
         title=data.title,
-        started_at=data.started_at or datetime.utcnow(),
+        selected_metrics=data.selected_metrics,
+        started_at=data.started_at or datetime.now(timezone.utc).replace(tzinfo=None),
         ended_at=data.ended_at,
         duration_seconds=data.duration_seconds,
         distance_miles=data.distance_miles,

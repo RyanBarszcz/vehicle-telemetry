@@ -1,15 +1,18 @@
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 
 @dataclass
 class TelemetryPoint:
     timestamp: str
-    rpm: float | None
-    throttle_percent: float | None
+    values: dict[str, Any]
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        return {
+            "timestamp": self.timestamp,
+            **self.values,
+        }
 
 
 def now_timestamp() -> str:

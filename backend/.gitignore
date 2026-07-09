@@ -36,3 +36,6 @@ alembic/__pycache__/
 # OS
 .DS_Store
 Thumbs.db
+
+# Test upload files
+uploads/

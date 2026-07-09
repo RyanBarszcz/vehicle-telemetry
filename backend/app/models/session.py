@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, JSON
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -28,7 +28,24 @@ class DrivingSession(Base):
 
     max_rpm = Column(Integer, nullable=False, default=0)
 
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    # CSV / S3 telemetry storage
+    selected_metrics = Column(JSON, nullable=True)
+
+    csv_file_name = Column(String, nullable=True)
+    csv_s3_key = Column(String, nullable=True)
+    csv_s3_url = Column(String, nullable=True)
+    csv_file_size_bytes = Column(Integer, nullable=True)
+
+    sample_count = Column(Integer, nullable=True)
+
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     vehicle = relationship("Vehicle", back_populates="sessions")
-    telemetry_points = relationship("TelemetryPoint", back_populates="session", cascade="all, delete-orphan",)
+
+    # Keep for now so old code/migrations don't break.
+    # Later, once CSV/S3 fully replaces DB telemetry rows, we can remove this.
+    telemetry_points = relationship(
+        "TelemetryPoint",
+        back_populates="session",
+        cascade="all, delete-orphan",
+    )

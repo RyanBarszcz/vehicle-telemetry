@@ -2,6 +2,7 @@ from pathlib import Path
 
 from rich.table import Table
 
+from metrics import AVAILABLE_METRICS
 from telemetry import TelemetryPoint
 
 
@@ -16,8 +17,11 @@ def make_table(
     table.add_column("Value")
 
     table.add_row("Samples", str(sample_count))
-    table.add_row("RPM", str(point.rpm))
-    table.add_row("Throttle", f"{point.throttle_percent} %")
+
+    for metric_key, value in point.values.items():
+        label = AVAILABLE_METRICS[metric_key]["label"]
+        table.add_row(label, str(value))
+
     table.add_row("Saving To", str(active_file))
 
     return table
