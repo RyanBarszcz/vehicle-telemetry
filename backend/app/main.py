@@ -6,6 +6,10 @@ from app.routes import auth, dashboard, sessions, telemetry, vehicles, session_f
 
 app = FastAPI(title="Vehicle Telemetry API")
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # TODO: Make sure routes are protected with prev stuff
 
 app.add_middleware(

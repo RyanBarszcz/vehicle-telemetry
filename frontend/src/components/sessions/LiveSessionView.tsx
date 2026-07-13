@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { toast } from "sonner";
 
+import { getLoggerStatus, stopLoggerSession } from "@/lib/loggerClient";
+
 import SessionHeader from "@/components/sessions/SessionHeader";
 import SessionStats from "@/components/sessions/SessionStats";
 import SessionChart from "@/components/sessions/SessionChart";
@@ -12,7 +14,7 @@ import EndSessionModal from "@/components/sessions/EndSessionModal";
 import TrackingOptionsModal from "@/components/sessions/TrackingOptionsModal";
 
 import {
-    createTelemetryBatch,
+    // createTelemetryBatch,
     endSession,
     type DrivingSession,
 } from "@/lib/api";
@@ -105,7 +107,9 @@ export default function LiveSessionView({
             const speedSumMph = prev.speed_sum_mph + point.speed_mph;
 
             return {
-                duration_seconds: prev.duration_seconds + 1,
+                duration_seconds: Math.floor(
+                    (Date.now() - new Date(session.started_at).getTime()) / 1000
+                ),
                 distance_miles: prev.distance_miles,
                 max_speed_mph: Math.max(prev.max_speed_mph, point.speed_mph),
                 avg_speed_mph: speedSumMph / telemetryCount,
@@ -140,11 +144,7 @@ export default function LiveSessionView({
                 return;
             }
 
-            const localPoints = await getLocalTelemetryPoints(session.id);
-
-            if (localPoints.length > 0) {
-                await createTelemetryBatch(token, session.id, localPoints);
-            }
+            await stopLoggerSession();
 
             const updatedSession = await endSession(token, session.id, {
                 title,
@@ -174,23 +174,39 @@ export default function LiveSessionView({
     useEffect(() => {
         if (session.ended_at || captureStopped || !trackingConfirmed) return;
 
-        const interval = window.setInterval(() => {
-            const point: LiveTelemetryPoint = {
-                id: crypto.randomUUID(),
-                sessionId: session.id,
-                timestamp: new Date().toISOString(),
-                speed_mph: Math.round(20 + Math.random() * 80),
-                rpm: Math.round(1200 + Math.random() * 5200),
-                throttle_percent: Math.round(Math.random() * 100),
-                coolant_temp_f: Math.round(180 + Math.random() * 25),
-                boost_psi: Number((Math.random() * 18).toFixed(1)),
-            };
+        const interval = window.setInterval(async () => {
+            try {
+                const status = await getLoggerStatus();
 
-            handleTelemetryPoint(point);
-        }, 1000);
+                if (!status.latest_point) return;
+
+                const values = status.latest_point as Record<string, number | string | null>;
+
+                const point: LiveTelemetryPoint = {
+                    id: crypto.randomUUID(),
+                    sessionId: session.id,
+                    timestamp:
+                        typeof values.timestamp === "string"
+                            ? values.timestamp
+                            : new Date().toISOString(),
+                    speed_mph: Number(values.speed_mph ?? 0),
+                    rpm: Number(values.rpm ?? 0),
+                    throttle_percent: Number(values.throttle_percent ?? 0),
+                    coolant_temp_f: Number(values.coolant_temp_f ?? 0),
+                    boost_psi:
+                        values.boost_psi === null || values.boost_psi === undefined
+                            ? null
+                            : Number(values.boost_psi),
+                };
+
+                await handleTelemetryPoint(point);
+            } catch (error) {
+                console.error("Failed to poll logger status", error);
+            }
+        }, 500);
 
         return () => window.clearInterval(interval);
-    }, [session, captureStopped, trackingConfirmed]);
+    }, [session.id, session.ended_at, captureStopped, trackingConfirmed]);
 
     return (
         <>

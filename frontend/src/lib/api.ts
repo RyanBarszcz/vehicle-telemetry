@@ -1,12 +1,16 @@
-import type { Vehicle } from "@/types/vehicle";
 import type { LocalTelemetryPoint } from "@/lib/localTelemetryDb";
 import type { LiveTelemetryPoint } from "@/types/telemetry";
+import type { Vehicle } from "@/types/vehicle";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 if (!API_URL) {
   throw new Error("Missing NEXT_PUBLIC_API_URL");
 }
+
+// =====================
+// Types
+// =====================
 
 export type CreateVehicleInput = {
   year: number;
@@ -17,6 +21,103 @@ export type CreateVehicleInput = {
   vin?: string;
   image_url?: string;
 };
+
+export type CreateSessionInput = {
+  title: string;
+  selected_metrics?: string[];
+  started_at?: string;
+  ended_at?: string;
+  duration_seconds?: number;
+  distance_miles?: number;
+  max_speed_mph?: number;
+  avg_speed_mph?: number;
+  max_rpm?: number;
+};
+
+export type DrivingSession = {
+  id: string;
+  vehicle_id: string;
+  title: string | null;
+  selected_metrics: string[] | null;
+  started_at: string;
+  ended_at: string | null;
+  duration_seconds: number;
+  distance_miles: number | null;
+  max_speed_mph: number;
+  avg_speed_mph: number | null;
+  max_rpm: number;
+  csv_file_name: string | null;
+  csv_s3_key: string | null;
+  csv_s3_url: string | null;
+  csv_file_size_bytes: number | null;
+  sample_count: number | null;
+  created_at: string;
+};
+
+export type EndSessionInput = {
+  title?: string;
+  duration_seconds: number;
+  distance_miles?: number | null;
+  max_speed_mph: number;
+  avg_speed_mph?: number | null;
+  max_rpm: number;
+};
+
+export type TelemetryPoint = {
+  id: string;
+  session_id: string;
+  timestamp: string;
+  rpm: number;
+  speed_mph: number;
+  throttle_percent: number;
+  coolant_temp_f: number;
+  intake_temp_f: number | null;
+  boost_psi: number | null;
+  fuel_level_percent: number | null;
+  battery_voltage: number | null;
+};
+
+export type CreateTelemetryPointInput = {
+  timestamp?: string;
+  rpm: number;
+  speed_mph: number;
+  throttle_percent: number;
+  coolant_temp_f: number;
+  intake_temp_f?: number;
+  boost_psi?: number;
+  fuel_level_percent?: number;
+  battery_voltage?: number;
+};
+
+export type DashboardVehicleSummary = {
+  id: string;
+  name: string;
+  year: number | null;
+  make: string;
+  model: string;
+};
+
+export type DashboardSessionSummary = {
+  id: string;
+  title: string;
+  vehicle_name: string;
+  duration_seconds: number;
+  distance_miles: number | null;
+  max_speed_mph: number;
+};
+
+export type DashboardSummary = {
+  vehicle_count: number;
+  session_count: number;
+  miles_logged: number;
+  active_alert_count: number;
+  vehicles: DashboardVehicleSummary[];
+  recent_sessions: DashboardSessionSummary[];
+};
+
+// =====================
+// Auth
+// =====================
 
 export async function syncAccount(token: string) {
   const res = await fetch(`${API_URL}/auth/sync`, {
@@ -35,6 +136,10 @@ export async function syncAccount(token: string) {
   return res.json();
 }
 
+// =====================
+// Vehicles
+// =====================
+
 export async function getVehicles(token: string): Promise<Vehicle[]> {
   const res = await fetch(`${API_URL}/vehicles/`, {
     headers: {
@@ -46,6 +151,25 @@ export async function getVehicles(token: string): Promise<Vehicle[]> {
     const errorText = await res.text();
     console.error("Get vehicles failed:", res.status, errorText);
     throw new Error("Failed to fetch vehicles");
+  }
+
+  return res.json();
+}
+
+export async function getVehicle(
+  token: string,
+  vehicleId: string
+): Promise<Vehicle> {
+  const res = await fetch(`${API_URL}/vehicles/${vehicleId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error("Get vehicle failed:", res.status, errorText);
+    throw new Error("Failed to fetch vehicle");
   }
 
   return res.json();
@@ -73,35 +197,24 @@ export async function createVehicle(
   return res.json();
 }
 
-export async function getVehicle(
-  token: string,
-  vehicleId: string
-): Promise<Vehicle> {
-  const res = await fetch(`${API_URL}/vehicles/${vehicleId}`, {
+// =====================
+// Sessions
+// =====================
+
+export async function getSessions(token: string): Promise<DrivingSession[]> {
+  const res = await fetch(`${API_URL}/sessions`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
+    cache: "no-store",
   });
 
   if (!res.ok) {
-    const errorText = await res.text();
-    console.error("Get vehicle failed:", res.status, errorText);
-    throw new Error("Failed to fetch vehicle");
+    throw new Error("Failed to fetch sessions");
   }
 
   return res.json();
 }
-
-export type CreateSessionInput = {
-  title: string;
-  started_at?: string;
-  ended_at?: string;
-  duration_seconds?: number;
-  distance_miles?: number;
-  max_speed_mph?: number;
-  avg_speed_mph?: number;
-  max_rpm?: number;
-};
 
 export async function getVehicleSessions(
   token: string,
@@ -117,6 +230,25 @@ export async function getVehicleSessions(
     const errorText = await res.text();
     console.error("Get vehicle sessions failed:", res.status, errorText);
     throw new Error("Failed to fetch vehicle sessions");
+  }
+
+  return res.json();
+}
+
+export async function getSession(
+  token: string,
+  sessionId: string
+): Promise<DrivingSession> {
+  const res = await fetch(`${API_URL}/sessions/${sessionId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error("Get session failed:", res.status, errorText);
+    throw new Error("Failed to fetch session");
   }
 
   return res.json();
@@ -145,54 +277,58 @@ export async function createVehicleSession(
   return res.json();
 }
 
-export async function getSession(
+export async function endSession(
   token: string,
-  sessionId: string
+  sessionId: string,
+  data: EndSessionInput
 ): Promise<DrivingSession> {
-  const res = await fetch(`${API_URL}/sessions/${sessionId}`, {
+  const res = await fetch(`${API_URL}/sessions/${sessionId}/end`, {
+    method: "PATCH",
     headers: {
+      "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
+    body: JSON.stringify(data),
   });
 
   if (!res.ok) {
-    const errorText = await res.text();
-    console.error("Get session failed:", res.status, errorText);
-    throw new Error("Failed to fetch session");
+    throw new Error("Failed to end session");
   }
 
   return res.json();
 }
 
-export type TelemetryPoint = {
-  id: string;
-  session_id: string;
-  timestamp: string;
+export async function uploadSessionCsv(
+  token: string,
+  sessionId: string,
+  csvFile: File,
+  manifestFile: File
+) {
+  const formData = new FormData();
 
-  rpm: number;
-  speed_mph: number;
-  throttle_percent: number;
-  coolant_temp_f: number;
+  formData.append("csv_file", csvFile);
+  formData.append("manifest_file", manifestFile);
 
-  intake_temp_f: number | null;
-  boost_psi: number | null;
-  fuel_level_percent: number | null;
-  battery_voltage: number | null;
-};
+  const res = await fetch(`${API_URL}/sessions/${sessionId}/upload-csv`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
 
-export type CreateTelemetryPointInput = {
-  timestamp?: string;
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error("Upload CSV failed:", res.status, errorText);
+    throw new Error("Failed to upload session CSV");
+  }
 
-  rpm: number;
-  speed_mph: number;
-  throttle_percent: number;
-  coolant_temp_f: number;
+  return res.json();
+}
 
-  intake_temp_f?: number;
-  boost_psi?: number;
-  fuel_level_percent?: number;
-  battery_voltage?: number;
-};
+// =====================
+// Telemetry Legacy DB Routes
+// =====================
 
 export async function getSessionTelemetry(
   token: string,
@@ -236,124 +372,43 @@ export async function createTelemetryPoint(
   return res.json();
 }
 
-export type EndSessionInput = {
-    title?: string;
-    duration_seconds: number;
-    distance_miles?: number | null;
-    max_speed_mph: number;
-    avg_speed_mph?: number | null;
-    max_rpm: number;
-};
-
-export async function endSession(
-    token: string,
-    sessionId: string,
-    data: EndSessionInput
-): Promise<DrivingSession> {
-    const res = await fetch(`${API_URL}/sessions/${sessionId}/end`, {
-        method: "PATCH",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(data),
-    });
-
-    if (!res.ok) {
-        throw new Error("Failed to end session");
-    }
-
-    return res.json();
-}
-
 export async function createTelemetryBatch(
-    token: string,
-    sessionId: string,
-    points: LocalTelemetryPoint[]
+  token: string,
+  sessionId: string,
+  points: LocalTelemetryPoint[]
 ) {
-    const res = await fetch(`${API_URL}/sessions/${sessionId}/telemetry/batch`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ points }),
-    });
+  const res = await fetch(`${API_URL}/sessions/${sessionId}/telemetry/batch`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ points }),
+  });
 
-    if (!res.ok) {
-        throw new Error("Failed to upload telemetry batch");
-    }
+  if (!res.ok) {
+    throw new Error("Failed to upload telemetry batch");
+  }
 
-    return res.json();
+  return res.json();
 }
 
-export type DashboardVehicleSummary = {
-    id: string;
-    name: string;
-    year: number | null;
-    make: string;
-    model: string;
-};
-
-export type DashboardSessionSummary = {
-    id: string;
-    title: string;
-    vehicle_name: string;
-    duration_seconds: number;
-    distance_miles: number | null;
-    max_speed_mph: number;
-};
-
-export type DashboardSummary = {
-    vehicle_count: number;
-    session_count: number;
-    miles_logged: number;
-    active_alert_count: number;
-    vehicles: DashboardVehicleSummary[];
-    recent_sessions: DashboardSessionSummary[];
-};
+// =====================
+// Dashboard
+// =====================
 
 export async function getDashboardSummary(
-    token: string
+  token: string
 ): Promise<DashboardSummary> {
-    const res = await fetch(`${API_URL}/dashboard`, {
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
-    });
+  const res = await fetch(`${API_URL}/dashboard`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
 
-    if (!res.ok) {
-        throw new Error("Failed to fetch dashboard summary");
-    }
+  if (!res.ok) {
+    throw new Error("Failed to fetch dashboard summary");
+  }
 
-    return res.json();
-}
-
-export type DrivingSession = {
-    id: string;
-    vehicle_id: string;
-    title: string | null;
-    started_at: string;
-    ended_at: string | null;
-    duration_seconds: number;
-    distance_miles: number | null;
-    max_speed_mph: number;
-    avg_speed_mph: number | null;
-    max_rpm: number;
-    created_at: string;
-};
-
-export async function getSessions(token: string): Promise<DrivingSession[]> {
-    const res = await fetch(`${API_URL}/sessions`, {
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
-        cache: "no-store",
-    });
-
-    if (!res.ok) {
-        throw new Error("Failed to fetch sessions");
-    }
-
-    return res.json();
+  return res.json();
 }

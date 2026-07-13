@@ -19,10 +19,12 @@ class CsvRecorder:
 
         self.runs_dir = Path("runs")
         self.active_dir = self.runs_dir / "active"
-        self.completed_dir = self.runs_dir / "completed"
+        self.pending_dir = self.runs_dir / "pending"
+        self.uploaded_dir = self.runs_dir / "uploaded"  
 
         self.active_dir.mkdir(parents=True, exist_ok=True)
-        self.completed_dir.mkdir(parents=True, exist_ok=True)
+        self.pending_dir.mkdir(parents=True, exist_ok=True)
+        self.uploaded_dir.mkdir(parents=True, exist_ok=True)
 
         self.active_file = self.active_dir / "current_run.tmp.csv"
         self.file = None
@@ -52,7 +54,7 @@ class CsvRecorder:
         else:
             finished_name = f"{timestamp}_gti.csv"
 
-        finished_file = self.completed_dir / finished_name
+        pending_file = self.pending_dir / finished_name
 
-        self.active_file.rename(finished_file)
-        return finished_file
+        self.active_file.rename(pending_file)
+        return pending_file

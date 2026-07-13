@@ -1,15 +1,18 @@
 "use client";
 
+import { useAuth } from "@clerk/nextjs";
 import { Play } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@clerk/nextjs";
 import { toast } from "sonner";
 
 import { createVehicleSession } from "@/lib/api";
+import { startLoggerSession } from "@/lib/loggerClient";
 
 type StartSessionButtonProps = {
     vehicleId: string;
 };
+
+const DEFAULT_METRICS = ["rpm", "throttle_percent"];
 
 export default function StartSessionButton({
     vehicleId,
@@ -30,6 +33,7 @@ export default function StartSessionButton({
 
             const session = await createVehicleSession(token, vehicleId, {
                 title: "New Driving Session",
+                selected_metrics: DEFAULT_METRICS,
                 started_at: new Date().toISOString(),
                 duration_seconds: 0,
                 distance_miles: 0,
@@ -38,8 +42,15 @@ export default function StartSessionButton({
                 max_rpm: 0,
             });
 
-            toast.success("Session started", { id: toastId });
+            await startLoggerSession({
+                session_id: session.id,
+                vehicle_id: vehicleId,
+                selected_metrics: DEFAULT_METRICS,
+                sample_rate: 5,
+                auth_token: token,
+            });
 
+            toast.success("Session started", { id: toastId });
             router.push(`/sessions/${session.id}`);
         } catch (error) {
             console.error(error);

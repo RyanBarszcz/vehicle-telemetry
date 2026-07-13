@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
@@ -9,11 +8,9 @@ from app.models.session import DrivingSession
 from app.models.user import User
 from app.models.vehicle import GarageVehicle, Vehicle
 from app.routes.auth import get_clerk_user_id
+from app.services.s3_service import upload_session_csv as upload_csv_to_s3
 
 router = APIRouter(tags=["Session Files"])
-
-UPLOAD_DIR = Path("uploads/session_csvs")
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def get_db_user(db: Session, clerk_id: str) -> User:
@@ -44,7 +41,7 @@ def get_owned_session(db: Session, user_id: str, session_id: str) -> DrivingSess
 
 
 @router.post("/sessions/{session_id}/upload-csv")
-async def upload_session_csv(
+async def upload_session_csv_route(
     session_id: str,
     csv_file: UploadFile = File(...),
     manifest_file: UploadFile = File(...),
@@ -60,39 +57,38 @@ async def upload_session_csv(
     if not manifest_file.filename or not manifest_file.filename.endswith(".json"):
         raise HTTPException(status_code=400, detail="Manifest JSON file is required")
 
-    session_dir = UPLOAD_DIR / session_id
-    session_dir.mkdir(parents=True, exist_ok=True)
-
-    csv_path = session_dir / csv_file.filename
-    manifest_path = session_dir / manifest_file.filename
-
-    csv_bytes = await csv_file.read()
     manifest_bytes = await manifest_file.read()
-
-    csv_path.write_bytes(csv_bytes)
-    manifest_path.write_bytes(manifest_bytes)
 
     try:
         manifest = json.loads(manifest_bytes.decode("utf-8"))
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid manifest JSON")
 
+    upload_result = await upload_csv_to_s3(
+        session_id=session_id,
+        csv_file=csv_file,
+    )
+
     session.selected_metrics = manifest.get("selected_metrics")
     session.sample_count = manifest.get("sample_count")
-    session.duration_seconds = manifest.get("duration_seconds", session.duration_seconds)
+    session.duration_seconds = manifest.get(
+        "duration_seconds",
+        session.duration_seconds,
+    )
 
-    session.csv_file_name = csv_file.filename
-    session.csv_s3_key = str(csv_path)
-    session.csv_s3_url = str(csv_path)
-    session.csv_file_size_bytes = len(csv_bytes)
+    session.csv_file_name = upload_result["file_name"]
+    session.csv_s3_key = upload_result["s3_key"]
+    session.csv_s3_url = upload_result["s3_key"]
+    session.csv_file_size_bytes = upload_result["file_size_bytes"]
 
     db.commit()
     db.refresh(session)
 
     return {
-        "message": "CSV uploaded",
+        "message": "CSV uploaded to S3",
         "session_id": session.id,
         "csv_file_name": session.csv_file_name,
+        "csv_s3_key": session.csv_s3_key,
         "csv_file_size_bytes": session.csv_file_size_bytes,
         "sample_count": session.sample_count,
     }
