@@ -14,7 +14,7 @@ from session_manifest import SessionManifest
 
 API_URL = "http://127.0.0.1:8000"
 UPLOAD_TIMEOUT_SECONDS = 30
-STOP_TIMEOUT_SECONDS = 15
+STOP_TIMEOUT_SECONDS = UPLOAD_TIMEOUT_SECONDS + 10
 
 app = FastAPI(
     title="Vehicle Telemetry Logger Service"

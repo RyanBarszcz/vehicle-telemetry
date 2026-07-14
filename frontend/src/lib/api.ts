@@ -292,7 +292,17 @@ export async function endSession(
   });
 
   if (!res.ok) {
-    throw new Error("Failed to end session");
+      const errorText = await res.text();
+
+      console.error(
+          "End session failed:",
+          res.status,
+          errorText
+      );
+
+      throw new Error(
+          `Failed to end session (${res.status}): ${errorText}`
+      );
   }
 
   return res.json();

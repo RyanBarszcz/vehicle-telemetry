@@ -36,6 +36,9 @@ import type {
     LiveTelemetryPoint,
 } from "@/types/telemetry";
 
+// 4 points/sec * 60 seconds * 3 minutes = 720
+const MAX_LIVE_TELEMETRY_POINTS = 720;
+
 type LiveSessionViewProps = {
     initialSession: DrivingSession;
 };
@@ -148,7 +151,9 @@ export default function LiveSessionView({
             setCurrentPoint(point);
 
             setTelemetryPoints((previousPoints) => [
-                ...previousPoints.slice(-59),
+                ...previousPoints.slice(
+                    -(MAX_LIVE_TELEMETRY_POINTS - 1)
+                ),
                 point,
             ]);
 
@@ -425,7 +430,9 @@ export default function LiveSessionView({
                         title,
                         duration_seconds: Math.max(
                             0,
-                            finalStats.duration_seconds
+                            Math.round(
+                                finalStats.duration_seconds
+                            )
                         ),
                         distance_miles:
                             finalStats.distance_miles,
@@ -433,8 +440,9 @@ export default function LiveSessionView({
                             finalStats.max_speed_mph,
                         avg_speed_mph:
                             finalStats.avg_speed_mph,
-                        max_rpm:
-                            finalStats.max_rpm,
+                        max_rpm: Math.round(
+                            finalStats.max_rpm
+                        ),
                     }
                 );
 
@@ -489,15 +497,18 @@ export default function LiveSessionView({
                 liveStats={liveStats}
             />
 
-            <SessionChart
-                sessionId={session.id}
-                points={telemetryPoints}
-                currentPoint={currentPoint}
-                trackedMetrics={trackedMetrics}
-                onReorderMetrics={
-                    setTrackedMetrics
-                }
-            />
+            <section className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
+                <SessionChart
+                    sessionId={session.id}
+                    points={telemetryPoints}
+                    currentPoint={currentPoint}
+                    trackedMetrics={trackedMetrics}
+                    onReorderMetrics={
+                        setTrackedMetrics
+                    }
+                />
+            </section>
+
 
             {!trackingConfirmed &&
                 !session.ended_at && (
@@ -528,7 +539,7 @@ export default function LiveSessionView({
                     avgSpeedMph={
                         liveStats.avg_speed_mph
                     }
-                    maxRpm={liveStats.max_rpm}
+                    maxRpm={Math.round(liveStats.max_rpm)}
                     saving={savingEnd}
                     onCancel={
                         handleCancelEndSession
