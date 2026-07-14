@@ -276,7 +276,7 @@ function SortableChartCard({
         <article
             ref={setNodeRef}
             style={style}
-            className={`w-full rounded-2xl border bg-zinc-900/70 p-3 ${isDragging
+            className={`min-w-0 w-full rounded-2xl border bg-zinc-900/70 p-3 ${isDragging
                 ? "scale-[1.01] border-blue-500/50 opacity-90 shadow-2xl shadow-black/40"
                 : "border-white/10"
                 }`}
@@ -322,6 +322,7 @@ function SortableChartCard({
                 <ResponsiveContainer
                     width="100%"
                     height="100%"
+                    minWidth={0}
                 >
                     <LineChart
                         data={data}
