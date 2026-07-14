@@ -1,67 +1,134 @@
-const LOGGER_URL = "http://localhost:8765";
+const LOGGER_URL =
+    process.env.NEXT_PUBLIC_LOGGER_URL ??
+    "http://localhost:8765";
+
+export type LoggerPointValue =
+    | string
+    | number
+    | null;
 
 export type StartLoggerSessionInput = {
-  session_id: string;
-  vehicle_id: string;
-  selected_metrics: string[];
-  sample_rate?: number;
-  auth_token: string;
+    session_id: string;
+    vehicle_id: string;
+    selected_metrics: string[];
+    sample_rate?: number;
+    auth_token: string;
+};
+
+export type LoggerUploadStatus =
+    | "uploaded"
+    | "pending"
+    | null;
+
+export type LoggerFilePair = {
+    csv_file: string;
+    manifest_file: string;
 };
 
 export type LoggerStatus = {
-  is_recording: boolean;
-  session_id: string | null;
-  vehicle_id: string | null;
-  selected_metrics: string[];
-  sample_rate: number;
-  sample_count: number;
-  latest_point: Record<string, unknown> | null;
-  last_file: {
-    csv_file: string;
-    manifest_file: string;
-  } | null;
-  error: string | null;
+    is_recording: boolean;
+    session_id: string | null;
+    vehicle_id: string | null;
+    selected_metrics: string[];
+    sample_rate: number;
+    sample_count: number;
+    latest_point: Record<string, LoggerPointValue> | null;
+    last_file: LoggerFilePair | null;
+    upload_status: LoggerUploadStatus;
+    error: string | null;
 };
 
-export async function startLoggerSession(input: StartLoggerSessionInput) {
-  const res = await fetch(`${LOGGER_URL}/start`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      ...input,
-      sample_rate: input.sample_rate ?? 5,
-    }),
-  });
+export type StopLoggerResponse = {
+    message: string;
+    last_file: LoggerFilePair | null;
+    upload_status: LoggerUploadStatus;
+    error: string | null;
+};
 
-  if (!res.ok) {
-    throw new Error("Failed to start local logger");
-  }
+async function getErrorMessage(
+    response: Response,
+    fallback: string
+): Promise<string> {
+    try {
+        const body = (await response.json()) as {
+            detail?: string;
+        };
 
-  return res.json();
+        return body.detail ?? fallback;
+    } catch {
+        return fallback;
+    }
 }
 
-export async function stopLoggerSession() {
-  const res = await fetch(`${LOGGER_URL}/stop`, {
-    method: "POST",
-  });
+export async function startLoggerSession(
+    input: StartLoggerSessionInput
+): Promise<{
+    message: string;
+    session_id: string;
+}> {
+    const response = await fetch(
+        `${LOGGER_URL}/start`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                ...input,
+                sample_rate:
+                    input.sample_rate ?? 5,
+            }),
+        }
+    );
 
-  if (!res.ok) {
-    throw new Error("Failed to stop local logger");
-  }
+    if (!response.ok) {
+        throw new Error(
+            await getErrorMessage(
+                response,
+                "Failed to start local logger."
+            )
+        );
+    }
 
-  return res.json();
+    return response.json();
+}
+
+export async function stopLoggerSession(): Promise<StopLoggerResponse> {
+    const response = await fetch(
+        `${LOGGER_URL}/stop`,
+        {
+            method: "POST",
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error(
+            await getErrorMessage(
+                response,
+                "Failed to stop local logger."
+            )
+        );
+    }
+
+    return response.json();
 }
 
 export async function getLoggerStatus(): Promise<LoggerStatus> {
-  const res = await fetch(`${LOGGER_URL}/status`, {
-    cache: "no-store",
-  });
+    const response = await fetch(
+        `${LOGGER_URL}/status`,
+        {
+            cache: "no-store",
+        }
+    );
 
-  if (!res.ok) {
-    throw new Error("Failed to get local logger status");
-  }
+    if (!response.ok) {
+        throw new Error(
+            await getErrorMessage(
+                response,
+                "Failed to get local logger status."
+            )
+        );
+    }
 
-  return res.json();
+    return response.json();
 }

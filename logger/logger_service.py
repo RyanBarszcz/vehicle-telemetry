@@ -1,31 +1,53 @@
 import threading
 import time
 from typing import Any
-import requests
 
+import requests
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from csv_recorder import CsvRecorder
 from obd_reader import ObdReader
 from session_manifest import SessionManifest
-from upload_package import UploadPackage
+
 
 API_URL = "http://127.0.0.1:8000"
+UPLOAD_TIMEOUT_SECONDS = 30
+STOP_TIMEOUT_SECONDS = 15
 
-app = FastAPI(title="Vehicle Telemetry Logger Service")
+app = FastAPI(
+    title="Vehicle Telemetry Logger Service"
+)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
+class StartRequest(BaseModel):
+    session_id: str
+    vehicle_id: str
+    selected_metrics: list[str]
+    sample_rate: float = Field(
+        default=5.0,
+        gt=0,
+        le=20,
+    )
+    auth_token: str
+
+
 recording_thread: threading.Thread | None = None
 stop_event = threading.Event()
+
+state_lock = threading.Lock()
 
 state: dict[str, Any] = {
     "is_recording": False,
@@ -35,167 +57,318 @@ state: dict[str, Any] = {
     "sample_rate": 5.0,
     "sample_count": 0,
     "latest_point": None,
-    "last_file": None,
     "upload_status": None,
+    "manifest": None,
     "error": None,
 }
 
-class StartRequest(BaseModel):
-    session_id: str
-    vehicle_id: str
-    selected_metrics: list[str]
-    sample_rate: float = 5.0
-    auth_token: str
+
+def update_state(**updates: Any) -> None:
+    with state_lock:
+        state.update(updates)
+
+
+def get_state_snapshot() -> dict[str, Any]:
+    with state_lock:
+        return dict(state)
+
 
 def upload_finished_run(
     session_id: str,
-    csv_file,
-    manifest_file,
+    csv_file_name: str,
+    csv_bytes: bytes,
+    manifest_file_name: str,
+    manifest_bytes: bytes,
     auth_token: str,
-) -> None:
-    with csv_file.open("rb") as csv, manifest_file.open("rb") as manifest:
-        response = requests.post(
-            f"{API_URL}/sessions/{session_id}/upload-csv",
-            headers={
-                "Authorization": f"Bearer {auth_token}",
-            },
-            files={
-                "csv_file": (csv_file.name, csv, "text/csv"),
-                "manifest_file": (
-                    manifest_file.name,
-                    manifest,
-                    "application/json",
-                ),
-            },
-            timeout=30,
+) -> dict[str, Any] | None:
+    response = requests.post(
+        f"{API_URL}/sessions/{session_id}/upload-csv",
+        headers={
+            "Authorization": f"Bearer {auth_token}",
+        },
+        files={
+            "csv_file": (
+                csv_file_name,
+                csv_bytes,
+                "text/csv",
+            ),
+            "manifest_file": (
+                manifest_file_name,
+                manifest_bytes,
+                "application/json",
+            ),
+        },
+        timeout=UPLOAD_TIMEOUT_SECONDS,
+    )
+
+    if not response.ok:
+        raise RuntimeError(
+            f"Backend returned {response.status_code}: "
+            f"{response.text}"
         )
 
-    response.raise_for_status()
+    if not response.content:
+        return None
+
+    try:
+        return response.json()
+    except requests.JSONDecodeError:
+        return {
+            "message": response.text,
+        }
 
 
 def recording_loop(request: StartRequest) -> None:
-    global state
+    reader: ObdReader | None = None
+    recorder: CsvRecorder | None = None
 
     try:
-        reader = ObdReader(request.selected_metrics)
+        reader = ObdReader(
+            request.selected_metrics
+        )
 
         recorder = CsvRecorder(
-            selected_metrics=request.selected_metrics,
+            selected_metrics=
+                request.selected_metrics,
             session_id=request.session_id,
             vehicle_id=request.vehicle_id,
         )
+
         recorder.start()
 
         manifest = SessionManifest(
             session_id=request.session_id,
             vehicle_id=request.vehicle_id,
-            selected_metrics=request.selected_metrics,
+            selected_metrics=
+                request.selected_metrics,
             sample_rate=request.sample_rate,
         )
 
-        delay_seconds = 1 / request.sample_rate
+        delay_seconds = (
+            1.0 / request.sample_rate
+        )
 
         while not stop_event.is_set():
+            loop_started_at = time.monotonic()
+
             point = reader.read_point()
+
             recorder.write_point(point)
             manifest.increment_samples()
 
-            state["sample_count"] = manifest.sample_count
-            state["latest_point"] = point.to_dict()
-
-            time.sleep(delay_seconds)
-
-        csv_file = recorder.finish()
-        manifest_file = manifest.finish(csv_file)
-
-        package = UploadPackage(csv_file=csv_file, manifest_file=manifest_file)
-        package.validate()
-
-        try:
-            upload_finished_run(
-                session_id=request.session_id,
-                csv_file=csv_file,
-                manifest_file=manifest_file,
-                auth_token=request.auth_token,
+            update_state(
+                sample_count=
+                    manifest.sample_count,
+                latest_point=
+                    point.to_dict(),
             )
 
-            state["upload_status"] = "uploaded"
+            elapsed_seconds = (
+                time.monotonic() -
+                loop_started_at
+            )
 
-        except Exception as upload_error:
-            state["upload_status"] = "pending"
-            state["error"] = f"Recording saved locally, upload failed: {upload_error}"
+            remaining_delay = max(
+                0.0,
+                delay_seconds -
+                elapsed_seconds,
+            )
 
-        state["last_file"] = {
-            "csv_file": str(csv_file),
-            "manifest_file": str(manifest_file),
-        }
+            stop_event.wait(
+                remaining_delay
+            )
+
+        (
+            csv_file_name,
+            csv_bytes,
+        ) = recorder.finish()
+
+        (
+            manifest_file_name,
+            manifest_bytes,
+            manifest_data,
+        ) = manifest.finish(
+            csv_file_name
+        )
+
+        update_state(
+            upload_status="uploading",
+            manifest=manifest_data,
+        )
+
+        upload_finished_run(
+            session_id=request.session_id,
+            csv_file_name=csv_file_name,
+            csv_bytes=csv_bytes,
+            manifest_file_name=
+                manifest_file_name,
+            manifest_bytes=manifest_bytes,
+            auth_token=request.auth_token,
+        )
+
+        update_state(
+            upload_status="uploaded",
+            error=None,
+        )
 
     except Exception as error:
-        state["error"] = str(error)
+        update_state(
+            upload_status="failed",
+            error=str(error),
+        )
 
     finally:
-        state["is_recording"] = False
+        update_state(
+            is_recording=False,
+        )
 
 
 @app.get("/health")
-def health():
-    return {"status": "ok"}
+def health() -> dict[str, str]:
+    return {
+        "status": "ok",
+    }
 
 
 @app.get("/status")
-def status():
-    return state
+def status() -> dict[str, Any]:
+    return get_state_snapshot()
 
 
 @app.post("/start")
-def start_recording(request: StartRequest):
+def start_recording(
+    request: StartRequest,
+) -> dict[str, str]:
     global recording_thread
 
-    if state["is_recording"]:
-        raise HTTPException(status_code=400, detail="Already recording")
+    current_state = get_state_snapshot()
+
+    if current_state["is_recording"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Already recording.",
+        )
+
+    if not request.selected_metrics:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "At least one metric must "
+                "be selected."
+            ),
+        )
+
+    if not request.auth_token.strip():
+        raise HTTPException(
+            status_code=401,
+            detail=(
+                "An authentication token "
+                "is required."
+            ),
+        )
 
     stop_event.clear()
 
-    state.update(
-        {
-            "is_recording": True,
-            "session_id": request.session_id,
-            "vehicle_id": request.vehicle_id,
-            "selected_metrics": request.selected_metrics,
-            "sample_rate": request.sample_rate,
-            "sample_count": 0,
-            "latest_point": None,
-            "last_file": None,
-            "upload_status": None,
-            "error": None,
-        }
+    update_state(
+        is_recording=True,
+        session_id=request.session_id,
+        vehicle_id=request.vehicle_id,
+        selected_metrics=
+            request.selected_metrics,
+        sample_rate=request.sample_rate,
+        sample_count=0,
+        latest_point=None,
+        upload_status=None,
+        manifest=None,
+        error=None,
     )
 
     recording_thread = threading.Thread(
         target=recording_loop,
         args=(request,),
         daemon=True,
+        name=(
+            f"telemetry-session-"
+            f"{request.session_id}"
+        ),
     )
+
     recording_thread.start()
 
-    return {"message": "Recording started", "session_id": request.session_id}
+    return {
+        "message": "Recording started.",
+        "session_id": request.session_id,
+    }
 
 
 @app.post("/stop")
-def stop_recording():
+def stop_recording() -> dict[str, Any]:
     global recording_thread
 
-    if not state["is_recording"]:
-        raise HTTPException(status_code=400, detail="Not currently recording")
+    current_state = get_state_snapshot()
+
+    if not current_state["is_recording"]:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Not currently recording."
+            ),
+        )
 
     stop_event.set()
 
-    if recording_thread:
-        recording_thread.join(timeout=10)
+    if recording_thread is not None:
+        recording_thread.join(
+            timeout=STOP_TIMEOUT_SECONDS
+        )
+
+    if (
+        recording_thread is not None
+        and recording_thread.is_alive()
+    ):
+        raise HTTPException(
+            status_code=504,
+            detail=(
+                "The logger did not stop "
+                "within the expected time."
+            ),
+        )
+
+    final_state = get_state_snapshot()
+
+    if (
+        final_state["upload_status"]
+        == "failed"
+    ):
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                final_state["error"]
+                or "The session upload failed."
+            ),
+        )
+
+    if (
+        final_state["upload_status"]
+        != "uploaded"
+    ):
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "The recording stopped, but "
+                "the upload did not complete."
+            ),
+        )
+
+    recording_thread = None
 
     return {
-        "message": "Recording stopped",
-        "last_file": state["last_file"],
-        "upload_status": state["upload_status"],
-        "error": state["error"],
+        "message": (
+            "Recording stopped and "
+            "uploaded successfully."
+        ),
+        "upload_status": "uploaded",
+        "manifest":
+            final_state["manifest"],
+        "error": None,
     }

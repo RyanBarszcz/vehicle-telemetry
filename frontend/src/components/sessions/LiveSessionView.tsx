@@ -1,11 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import {
+    useCallback,
+    useEffect,
+    useRef,
+    useState,
+} from "react";
 import { useAuth } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { getLoggerStatus, stopLoggerSession } from "@/lib/loggerClient";
+import {
+    getLoggerStatus,
+    stopLoggerSession,
+} from "@/lib/loggerClient";
 
 import SessionHeader from "@/components/sessions/SessionHeader";
 import SessionStats from "@/components/sessions/SessionStats";
@@ -14,7 +22,6 @@ import EndSessionModal from "@/components/sessions/EndSessionModal";
 import TrackingOptionsModal from "@/components/sessions/TrackingOptionsModal";
 
 import {
-    // createTelemetryBatch,
     endSession,
     type DrivingSession,
 } from "@/lib/api";
@@ -24,17 +31,38 @@ import {
     type TelemetryMetricKey,
 } from "@/lib/telemetryMetrics";
 
-import {
-    deleteLocalTelemetryPoints,
-    getLocalTelemetryPoints,
-    saveLocalTelemetryPoint,
-} from "@/lib/localTelemetryDb";
-
-import type { LiveSessionStats, LiveTelemetryPoint } from "@/types/telemetry";
+import type {
+    LiveSessionStats,
+    LiveTelemetryPoint,
+} from "@/types/telemetry";
 
 type LiveSessionViewProps = {
     initialSession: DrivingSession;
 };
+
+function numberFromLoggerValue(
+    value: string | number | null | undefined
+): number {
+    const parsedValue = Number(value ?? 0);
+
+    return Number.isFinite(parsedValue)
+        ? parsedValue
+        : 0;
+}
+
+function nullableNumberFromLoggerValue(
+    value: string | number | null | undefined
+): number | null {
+    if (value === null || value === undefined) {
+        return null;
+    }
+
+    const parsedValue = Number(value);
+
+    return Number.isFinite(parsedValue)
+        ? parsedValue
+        : null;
+}
 
 export default function LiveSessionView({
     initialSession,
@@ -42,171 +70,410 @@ export default function LiveSessionView({
     const router = useRouter();
     const { getToken } = useAuth();
 
-    const [session, setSession] = useState<DrivingSession>(initialSession);
+    const [session, setSession] =
+        useState<DrivingSession>(initialSession);
 
-    const [trackingConfirmed, setTrackingConfirmed] = useState(false);
+    const [
+        trackingConfirmed,
+        setTrackingConfirmed,
+    ] = useState(false);
+
     const [trackedMetrics, setTrackedMetrics] =
-        useState<TelemetryMetricKey[]>(defaultTrackedMetrics);
+        useState<TelemetryMetricKey[]>(
+            initialSession.selected_metrics?.length
+                ? (initialSession.selected_metrics as TelemetryMetricKey[])
+                : defaultTrackedMetrics
+        );
 
-    const [showEndModal, setShowEndModal] = useState(false);
-    const [savingEnd, setSavingEnd] = useState(false);
-    const [captureStopped, setCaptureStopped] = useState(false);
+    const [showEndModal, setShowEndModal] =
+        useState(false);
+
+    const [savingEnd, setSavingEnd] =
+        useState(false);
+
+    const [captureStopped, setCaptureStopped] =
+        useState(false);
 
     const [currentPoint, setCurrentPoint] =
         useState<LiveTelemetryPoint | null>(null);
 
-    const [telemetryPoints, setTelemetryPoints] = useState<LiveTelemetryPoint[]>(
+    const [telemetryPoints, setTelemetryPoints] =
+        useState<LiveTelemetryPoint[]>([]);
+
+    const [liveStats, setLiveStats] =
+        useState<LiveSessionStats>({
+            duration_seconds:
+                initialSession.duration_seconds,
+            distance_miles:
+                initialSession.distance_miles ?? 0,
+            max_speed_mph:
+                initialSession.max_speed_mph,
+            avg_speed_mph:
+                initialSession.avg_speed_mph ?? 0,
+            max_rpm: initialSession.max_rpm,
+            telemetry_count: 0,
+            speed_sum_mph: 0,
+        });
+
+    /*
+     * performance.now() is used for elapsed time because it
+     * does not jump when the operating-system clock changes.
+     */
+    const timerStartedAtRef = useRef<number | null>(
+        null
+    );
+
+    /*
+     * /status returns the most recent logger point. Because
+     * the frontend polls repeatedly, the same point could be
+     * returned more than once. This prevents duplicate chart
+     * and stats updates.
+     */
+    const lastPointTimestampRef =
+        useRef<string | null>(null);
+
+    /*
+     * Keep the current calculated values available during
+     * end-session saving without waiting for another render.
+     */
+    const liveStatsRef =
+        useRef<LiveSessionStats>(liveStats);
+
+    useEffect(() => {
+        liveStatsRef.current = liveStats;
+    }, [liveStats]);
+
+    const handleTelemetryPoint = useCallback(
+        (point: LiveTelemetryPoint) => {
+            setCurrentPoint(point);
+
+            setTelemetryPoints((previousPoints) => [
+                ...previousPoints.slice(-59),
+                point,
+            ]);
+
+            setLiveStats((previousStats) => {
+                const telemetryCount =
+                    previousStats.telemetry_count + 1;
+
+                const speedSumMph =
+                    previousStats.speed_sum_mph +
+                    point.speed_mph;
+
+                return {
+                    ...previousStats,
+                    max_speed_mph: Math.max(
+                        previousStats.max_speed_mph,
+                        point.speed_mph
+                    ),
+                    avg_speed_mph:
+                        speedSumMph / telemetryCount,
+                    max_rpm: Math.max(
+                        previousStats.max_rpm,
+                        point.rpm
+                    ),
+                    telemetry_count:
+                        telemetryCount,
+                    speed_sum_mph: speedSumMph,
+                };
+            });
+        },
         []
     );
 
-    const [liveStats, setLiveStats] = useState<LiveSessionStats>({
-        duration_seconds: initialSession.duration_seconds,
-        distance_miles: initialSession.distance_miles ?? 0,
-        max_speed_mph: initialSession.max_speed_mph,
-        avg_speed_mph: initialSession.avg_speed_mph ?? 0,
-        max_rpm: initialSession.max_rpm,
-        telemetry_count: 0,
-        speed_sum_mph: 0,
-    });
-
+    /*
+     * Run the live timer independently from incoming points.
+     * The logger remains responsible for the final manifest
+     * duration.
+     */
     useEffect(() => {
-        async function loadLocalTelemetry() {
-            try {
-                const localPoints = await getLocalTelemetryPoints(initialSession.id);
+        if (
+            session.ended_at ||
+            captureStopped ||
+            !trackingConfirmed
+        ) {
+            return;
+        }
 
-                setTelemetryPoints(localPoints.slice(-60));
-                setCurrentPoint(localPoints[localPoints.length - 1] ?? null);
+        if (timerStartedAtRef.current === null) {
+            timerStartedAtRef.current =
+                performance.now() -
+                initialSession.duration_seconds * 1000;
+        }
 
-                setLiveStats({
-                    duration_seconds: initialSession.duration_seconds,
-                    distance_miles: initialSession.distance_miles ?? 0,
-                    max_speed_mph: initialSession.max_speed_mph,
-                    avg_speed_mph: initialSession.avg_speed_mph ?? 0,
-                    max_rpm: initialSession.max_rpm,
-                    telemetry_count: localPoints.length,
-                    speed_sum_mph: localPoints.reduce(
-                        (sum, point) => sum + point.speed_mph,
-                        0
-                    ),
-                });
-            } catch (error) {
-                console.error("Failed to load local telemetry", error);
-                toast.error("Failed to load local telemetry");
+        const intervalId = window.setInterval(() => {
+            const timerStartedAt =
+                timerStartedAtRef.current;
+
+            if (timerStartedAt === null) {
+                return;
             }
+
+            const elapsedSeconds = Math.max(
+                0,
+                Math.floor(
+                    (
+                        performance.now() -
+                        timerStartedAt
+                    ) / 1000
+                )
+            );
+
+            setLiveStats((previousStats) => ({
+                ...previousStats,
+                duration_seconds:
+                    elapsedSeconds,
+            }));
+        }, 1000);
+
+        return () => {
+            window.clearInterval(intervalId);
+        };
+    }, [
+        captureStopped,
+        initialSession.duration_seconds,
+        session.ended_at,
+        trackingConfirmed,
+    ]);
+
+    /*
+     * Poll only for live display values. Python is writing
+     * the permanent CSV and manifest.
+     */
+    useEffect(() => {
+        if (
+            session.ended_at ||
+            captureStopped ||
+            !trackingConfirmed
+        ) {
+            return;
         }
 
-        loadLocalTelemetry();
-    }, [initialSession]);
+        let requestInProgress = false;
 
-    async function handleTelemetryPoint(point: LiveTelemetryPoint) {
-        setCurrentPoint(point);
-        setTelemetryPoints((prev) => [...prev.slice(-59), point]);
+        const pollLogger = async () => {
+            if (requestInProgress) {
+                return;
+            }
 
-        setLiveStats((prev) => {
-            const telemetryCount = prev.telemetry_count + 1;
-            const speedSumMph = prev.speed_sum_mph + point.speed_mph;
+            requestInProgress = true;
 
-            return {
-                duration_seconds: Math.floor(
-                    (Date.now() - new Date(session.started_at).getTime()) / 1000
-                ),
-                distance_miles: prev.distance_miles,
-                max_speed_mph: Math.max(prev.max_speed_mph, point.speed_mph),
-                avg_speed_mph: speedSumMph / telemetryCount,
-                max_rpm: Math.max(prev.max_rpm, point.rpm),
-                telemetry_count: telemetryCount,
-                speed_sum_mph: speedSumMph,
-            };
-        });
+            try {
+                const status =
+                    await getLoggerStatus();
 
-        try {
-            await saveLocalTelemetryPoint(point);
-        } catch (error) {
-            console.error("Failed to save telemetry locally", error);
-            toast.error("Failed to save telemetry locally");
-        }
-    }
+                if (status.error) {
+                    console.error(
+                        "Logger error:",
+                        status.error
+                    );
+                }
+
+                if (
+                    status.session_id &&
+                    status.session_id !== session.id
+                ) {
+                    console.warn(
+                        "Logger is recording a different session.",
+                        {
+                            expectedSessionId:
+                                session.id,
+                            loggerSessionId:
+                                status.session_id,
+                        }
+                    );
+
+                    return;
+                }
+
+                const values =
+                    status.latest_point;
+
+                if (!values) {
+                    return;
+                }
+
+                const timestamp =
+                    typeof values.timestamp ===
+                        "string"
+                        ? values.timestamp
+                        : new Date().toISOString();
+
+                if (
+                    lastPointTimestampRef.current ===
+                    timestamp
+                ) {
+                    return;
+                }
+
+                lastPointTimestampRef.current =
+                    timestamp;
+
+                const point: LiveTelemetryPoint = {
+                    id: crypto.randomUUID(),
+                    sessionId: session.id,
+                    timestamp,
+                    speed_mph:
+                        numberFromLoggerValue(
+                            values.speed_mph
+                        ),
+                    rpm: numberFromLoggerValue(
+                        values.rpm
+                    ),
+                    throttle_percent:
+                        numberFromLoggerValue(
+                            values.throttle_percent
+                        ),
+                    coolant_temp_f:
+                        numberFromLoggerValue(
+                            values.coolant_temp_f
+                        ),
+                    boost_psi:
+                        nullableNumberFromLoggerValue(
+                            values.boost_psi
+                        ),
+                };
+
+                handleTelemetryPoint(point);
+            } catch (error) {
+                console.error(
+                    "Failed to poll logger status",
+                    error
+                );
+            } finally {
+                requestInProgress = false;
+            }
+        };
+
+        void pollLogger();
+
+        const intervalId = window.setInterval(
+            () => {
+                void pollLogger();
+            },
+            250
+        );
+
+        return () => {
+            window.clearInterval(intervalId);
+        };
+    }, [
+        captureStopped,
+        handleTelemetryPoint,
+        session.ended_at,
+        session.id,
+        trackingConfirmed,
+    ]);
 
     function handleEndSession() {
         setCaptureStopped(true);
         setShowEndModal(true);
     }
 
-    async function handleSaveEndedSession(title: string) {
-        const toastId = toast.loading("Saving session...");
+    function handleCancelEndSession() {
+        setShowEndModal(false);
+        setCaptureStopped(false);
+    }
+
+    async function handleSaveEndedSession(
+        title: string
+    ) {
+        const toastId = toast.loading(
+            "Stopping logger and uploading session..."
+        );
+
         setSavingEnd(true);
 
         try {
             const token = await getToken();
 
             if (!token) {
-                toast.error("Please sign in.", { id: toastId });
-                return;
+                throw new Error(
+                    "Please sign in before saving."
+                );
             }
 
-            await stopLoggerSession();
+            /*
+             * The logger's /stop route:
+             * 1. stops the recording loop;
+             * 2. finalizes the CSV;
+             * 3. creates the manifest;
+             * 4. attempts the backend upload;
+             * 5. returns the upload result.
+             */
+            const stopResult =
+                await stopLoggerSession();
 
-            const updatedSession = await endSession(token, session.id, {
-                title,
-                duration_seconds: liveStats.duration_seconds,
-                distance_miles: liveStats.distance_miles,
-                max_speed_mph: liveStats.max_speed_mph,
-                avg_speed_mph: liveStats.avg_speed_mph,
-                max_rpm: liveStats.max_rpm,
-            });
+            if (
+                stopResult.upload_status !==
+                "uploaded"
+            ) {
+                throw new Error(
+                    stopResult.error ??
+                    "The logger created the files, but the upload failed."
+                );
+            }
 
-            await deleteLocalTelemetryPoints(session.id);
+            const finalStats =
+                liveStatsRef.current;
+
+            const updatedSession =
+                await endSession(
+                    token,
+                    session.id,
+                    {
+                        title,
+                        duration_seconds: Math.max(
+                            0,
+                            finalStats.duration_seconds
+                        ),
+                        distance_miles:
+                            finalStats.distance_miles,
+                        max_speed_mph:
+                            finalStats.max_speed_mph,
+                        avg_speed_mph:
+                            finalStats.avg_speed_mph,
+                        max_rpm:
+                            finalStats.max_rpm,
+                    }
+                );
 
             setSession(updatedSession);
             setShowEndModal(false);
 
-            toast.success("Session saved", { id: toastId });
+            toast.success(
+                "Session uploaded and saved.",
+                {
+                    id: toastId,
+                }
+            );
+
             router.push("/sessions");
             router.refresh();
         } catch (error) {
-            console.error(error);
-            toast.error("Session saved locally. Sync failed.", { id: toastId });
+            console.error(
+                "Failed to finish session",
+                error
+            );
+
+            toast.error(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to finish the session.",
+                {
+                    id: toastId,
+                }
+            );
+
+            /*
+             * Keep the end modal open. The user should not be
+             * redirected when the upload or backend update
+             * failed.
+             */
         } finally {
             setSavingEnd(false);
         }
     }
-
-    useEffect(() => {
-        if (session.ended_at || captureStopped || !trackingConfirmed) return;
-
-        const interval = window.setInterval(async () => {
-            try {
-                const status = await getLoggerStatus();
-
-                if (!status.latest_point) return;
-
-                const values = status.latest_point as Record<string, number | string | null>;
-
-                const point: LiveTelemetryPoint = {
-                    id: crypto.randomUUID(),
-                    sessionId: session.id,
-                    timestamp:
-                        typeof values.timestamp === "string"
-                            ? values.timestamp
-                            : new Date().toISOString(),
-                    speed_mph: Number(values.speed_mph ?? 0),
-                    rpm: Number(values.rpm ?? 0),
-                    throttle_percent: Number(values.throttle_percent ?? 0),
-                    coolant_temp_f: Number(values.coolant_temp_f ?? 0),
-                    boost_psi:
-                        values.boost_psi === null || values.boost_psi === undefined
-                            ? null
-                            : Number(values.boost_psi),
-                };
-
-                await handleTelemetryPoint(point);
-            } catch (error) {
-                console.error("Failed to poll logger status", error);
-            }
-        }, 500);
-
-        return () => window.clearInterval(interval);
-    }, [session.id, session.ended_at, captureStopped, trackingConfirmed]);
 
     return (
         <>
@@ -217,39 +484,58 @@ export default function LiveSessionView({
                 onEndSession={handleEndSession}
             />
 
-            <SessionStats session={session} liveStats={liveStats} />
+            <SessionStats
+                session={session}
+                liveStats={liveStats}
+            />
 
             <SessionChart
                 sessionId={session.id}
                 points={telemetryPoints}
                 currentPoint={currentPoint}
                 trackedMetrics={trackedMetrics}
-                onReorderMetrics={setTrackedMetrics}
+                onReorderMetrics={
+                    setTrackedMetrics
+                }
             />
 
-            {!trackingConfirmed && !session.ended_at && (
-                <TrackingOptionsModal
-                    onConfirm={(metrics) => {
-                        setTrackedMetrics(metrics);
-                        setTrackingConfirmed(true);
-                    }}
-                />
-            )}
+            {!trackingConfirmed &&
+                !session.ended_at && (
+                    <TrackingOptionsModal
+                        onConfirm={(metrics) => {
+                            setTrackedMetrics(
+                                metrics
+                            );
+                            setTrackingConfirmed(
+                                true
+                            );
+                        }}
+                    />
+                )}
 
             {showEndModal && (
                 <EndSessionModal
                     defaultTitle={session.title}
-                    durationSeconds={liveStats.duration_seconds}
-                    distanceMiles={liveStats.distance_miles}
-                    maxSpeedMph={liveStats.max_speed_mph}
-                    avgSpeedMph={liveStats.avg_speed_mph}
+                    durationSeconds={
+                        liveStats.duration_seconds
+                    }
+                    distanceMiles={
+                        liveStats.distance_miles
+                    }
+                    maxSpeedMph={
+                        liveStats.max_speed_mph
+                    }
+                    avgSpeedMph={
+                        liveStats.avg_speed_mph
+                    }
                     maxRpm={liveStats.max_rpm}
                     saving={savingEnd}
-                    onCancel={() => {
-                        setShowEndModal(false);
-                        setCaptureStopped(false);
-                    }}
-                    onSave={handleSaveEndedSession}
+                    onCancel={
+                        handleCancelEndSession
+                    }
+                    onSave={
+                        handleSaveEndedSession
+                    }
                 />
             )}
         </>

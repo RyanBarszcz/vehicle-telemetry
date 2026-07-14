@@ -1,6 +1,6 @@
 import json
-from datetime import datetime
-from pathlib import Path
+import time
+from datetime import datetime, timezone
 
 
 class SessionManifest:
@@ -15,30 +15,54 @@ class SessionManifest:
         self.vehicle_id = vehicle_id
         self.selected_metrics = selected_metrics
         self.sample_rate = sample_rate
-        self.started_at = datetime.now()
-        self.ended_at = None
+
+        self.started_at = datetime.now(timezone.utc)
+        self.started_monotonic = time.monotonic()
         self.sample_count = 0
 
     def increment_samples(self) -> None:
         self.sample_count += 1
 
-    def finish(self, csv_file: Path) -> Path:
-        self.ended_at = datetime.now()
+    def finish(
+        self,
+        csv_file_name: str,
+    ) -> tuple[str, bytes, dict]:
+        ended_at = datetime.now(timezone.utc)
 
-        manifest_file = csv_file.with_suffix(".json")
+        duration_seconds = max(
+            0,
+            round(
+                time.monotonic() -
+                self.started_monotonic
+            ),
+        )
 
-        data = {
+        manifest = {
             "session_id": self.session_id,
             "vehicle_id": self.vehicle_id,
             "selected_metrics": self.selected_metrics,
             "sample_rate": self.sample_rate,
-            "started_at": self.started_at.isoformat(timespec="milliseconds"),
-            "ended_at": self.ended_at.isoformat(timespec="milliseconds"),
-            "duration_seconds": int((self.ended_at - self.started_at).total_seconds()),
+            "started_at": self.started_at.isoformat(),
+            "ended_at": ended_at.isoformat(),
+            "duration_seconds": duration_seconds,
             "sample_count": self.sample_count,
-            "csv_file": csv_file.name,
+            "csv_file": csv_file_name,
         }
 
-        manifest_file.write_text(json.dumps(data, indent=2))
+        if self.session_id:
+            manifest_file_name = (
+                f"session_{self.session_id}_manifest.json"
+            )
+        else:
+            manifest_file_name = "session_manifest.json"
 
-        return manifest_file
+        manifest_bytes = json.dumps(
+            manifest,
+            indent=2,
+        ).encode("utf-8")
+
+        return (
+            manifest_file_name,
+            manifest_bytes,
+            manifest,
+        )
