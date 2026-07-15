@@ -37,6 +37,7 @@ export type CreateSessionInput = {
 export type DrivingSession = {
   id: string;
   vehicle_id: string;
+  vehicle_name: string;
   title: string | null;
   selected_metrics: string[] | null;
   started_at: string;

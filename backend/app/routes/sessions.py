@@ -51,15 +51,50 @@ def get_user_sessions(
 ):
     user = get_db_user(db, clerk_user_id)
 
-    sessions = (
-        db.query(DrivingSession)
-        .join(GarageVehicle, GarageVehicle.vehicle_id == DrivingSession.vehicle_id)
+    results = (
+        db.query(
+            DrivingSession,
+            Vehicle.nickname,
+            Vehicle.year,
+            Vehicle.make,
+            Vehicle.model,
+            Vehicle.trim,
+        )
+        .join(
+            GarageVehicle,
+            GarageVehicle.vehicle_id == DrivingSession.vehicle_id,
+        )
+        .join(
+            Vehicle,
+            Vehicle.id == DrivingSession.vehicle_id,
+        )
         .filter(GarageVehicle.user_id == user.id)
         .order_by(DrivingSession.started_at.desc())
         .all()
     )
 
-    return sessions
+    return [
+        {
+            "id": session.id,
+            "vehicle_id": session.vehicle_id,
+            "title": session.title,
+            "started_at": session.started_at,
+            "ended_at": session.ended_at,
+            "duration_seconds": session.duration_seconds,
+            "distance_miles": session.distance_miles,
+            "max_speed_mph": session.max_speed_mph,
+            "avg_speed_mph": session.avg_speed_mph,
+            "max_rpm": session.max_rpm,
+            "created_at": session.created_at,
+            "vehicle_name": nickname
+            or " ".join(
+                str(value)
+                for value in [year, make, model, trim]
+                if value
+            ),
+        }
+        for session, nickname, year, make, model, trim in results
+    ]
 
 
 @router.get(

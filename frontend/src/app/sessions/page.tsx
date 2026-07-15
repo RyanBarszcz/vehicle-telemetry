@@ -1,11 +1,16 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { CalendarDays, Gauge, Timer, Route, ArrowRight } from "lucide-react";
-import { formatDuration } from "@/lib/formatters";
+import {
+    ArrowRight,
+    CalendarDays,
+    Gauge,
+    Timer,
+} from "lucide-react";
 
-import { getSessions } from "@/lib/api";
 import DownloadSessionCsvButton from "@/components/sessions/DownloadSessionCsvButton";
+import { getSessions } from "@/lib/api";
+import { formatDuration } from "@/lib/formatters";
 
 function formatDate(date: string) {
     return new Intl.DateTimeFormat("en-US", {
@@ -16,7 +21,6 @@ function formatDate(date: string) {
 }
 
 // TODO: Add a delete option
-
 
 export default async function SessionsPage() {
     const { userId, getToken } = await auth();
@@ -47,14 +51,19 @@ export default async function SessionsPage() {
                         </h1>
 
                         <p className="mt-3 max-w-2xl text-zinc-400">
-                            Review every drive, compare performance over time, and dive
-                            into detailed telemetry from past sessions.
+                            Review every drive, compare performance over time,
+                            and dive into detailed telemetry from past sessions.
                         </p>
                     </div>
 
                     <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-4">
-                        <p className="text-sm text-zinc-400">Total Sessions</p>
-                        <p className="mt-1 text-3xl font-bold">{sessions.length}</p>
+                        <p className="text-sm text-zinc-400">
+                            Total Sessions
+                        </p>
+
+                        <p className="mt-1 text-3xl font-bold">
+                            {sessions.length}
+                        </p>
                     </div>
                 </div>
 
@@ -65,9 +74,9 @@ export default async function SessionsPage() {
                         </h2>
 
                         <p className="mx-auto mt-3 max-w-md text-zinc-400">
-                            Start your first driving session from one of your vehicles.
-                            Your telemetry, performance stats, and trip history will appear
-                            here.
+                            Start your first driving session from one of your
+                            vehicles. Your telemetry, performance stats, and
+                            trip history will appear here.
                         </p>
 
                         <Link
@@ -81,91 +90,55 @@ export default async function SessionsPage() {
                 ) : (
                     <div className="grid gap-4">
                         {sessions.map((session) => (
-                            <div
+                            <article
                                 key={session.id}
-                                className="group relative rounded-3xl border border-white/10 bg-white/[0.03] p-6 transition hover:border-blue-500/40 hover:bg-white/[0.06]"
+                                className="group rounded-3xl border border-white/10 bg-white/[0.03] p-5 transition hover:border-blue-500/40 hover:bg-white/[0.06]"
                             >
-                                <div className="flex flex-col justify-between gap-5 md:flex-row md:items-center">
+                                <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
                                     <Link
                                         href={`/sessions/${session.id}`}
-                                        className="min-w-0 flex-1"
+                                        className="flex min-w-0 flex-1 items-center gap-4"
                                     >
-                                        <div className="flex items-center gap-3">
-                                            <div className="rounded-2xl bg-blue-500/10 p-3 text-blue-400">
-                                                <Gauge className="h-5 w-5" />
-                                            </div>
+                                        <div className="shrink-0 rounded-2xl bg-blue-500/10 p-3 text-blue-400">
+                                            <Gauge className="h-5 w-5" />
+                                        </div>
 
-                                            <div>
-                                                <h2 className="text-xl font-semibold text-white">
-                                                    {session.title ||
-                                                        "Driving Session"}
-                                                </h2>
+                                        <div className="min-w-0">
+                                            <p className="truncate text-sm font-medium text-blue-400">
+                                                {session.vehicle_name}
+                                            </p>
 
-                                                <p className="mt-1 flex items-center gap-2 text-sm text-zinc-400">
-                                                    <CalendarDays className="h-4 w-4" />
+                                            <h2 className="mt-1 truncate text-lg font-semibold text-white">
+                                                {session.title ||
+                                                    "Driving Session"}
+                                            </h2>
 
-                                                    {formatDate(
-                                                        session.started_at
-                                                    )}
-                                                </p>
-                                            </div>
+                                            <p className="mt-1 flex items-center gap-2 text-sm text-zinc-400">
+                                                <CalendarDays className="h-4 w-4 shrink-0" />
+                                                {formatDate(
+                                                    session.started_at
+                                                )}
+                                            </p>
                                         </div>
                                     </Link>
 
                                     <Link
                                         href={`/sessions/${session.id}`}
-                                        className="grid flex-1 grid-cols-2 gap-4 sm:grid-cols-4 md:min-w-[520px]"
+                                        className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 transition hover:border-blue-500/30 hover:bg-blue-500/[0.05] sm:min-w-[150px]"
                                     >
+                                        <div className="rounded-xl bg-white/[0.05] p-2 text-zinc-400">
+                                            <Timer className="h-4 w-4" />
+                                        </div>
+
                                         <div>
-                                            <p className="flex items-center gap-1 text-xs text-zinc-500">
-                                                <Timer className="h-3.5 w-3.5" />
+                                            <p className="text-xs text-zinc-500">
                                                 Duration
                                             </p>
 
-                                            <p className="mt-1 font-semibold">
+                                            <p className="mt-0.5 font-semibold text-white">
                                                 {formatDuration(
                                                     session.duration_seconds
                                                 )}
-                                            </p>
-                                        </div>
-
-                                        <div>
-                                            <p className="text-xs text-zinc-500">
-                                                Max Speed
-                                            </p>
-
-                                            <p className="mt-1 font-semibold">
-                                                {Math.round(
-                                                    session.max_speed_mph
-                                                )}{" "}
-                                                mph
-                                            </p>
-                                        </div>
-
-                                        <div>
-                                            <p className="text-xs text-zinc-500">
-                                                Max RPM
-                                            </p>
-
-                                            <p className="mt-1 font-semibold">
-                                                {Math.round(
-                                                    session.max_rpm
-                                                ).toLocaleString()}
-                                            </p>
-                                        </div>
-
-                                        <div>
-                                            <p className="flex items-center gap-1 text-xs text-zinc-500">
-                                                <Route className="h-3.5 w-3.5" />
-                                                Distance
-                                            </p>
-
-                                            <p className="mt-1 font-semibold">
-                                                {session.distance_miles
-                                                    ? `${session.distance_miles.toFixed(
-                                                        1
-                                                    )} mi`
-                                                    : "—"}
                                             </p>
                                         </div>
                                     </Link>
@@ -189,7 +162,7 @@ export default async function SessionsPage() {
                                         </Link>
                                     </div>
                                 </div>
-                            </div>
+                            </article>
                         ))}
                     </div>
                 )}

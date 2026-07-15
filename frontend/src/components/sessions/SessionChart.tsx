@@ -140,52 +140,6 @@ export default function SessionChart({
                 </div>
             ) : (
                 <div className="space-y-6">
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                        <div className="rounded-2xl border border-white/5 bg-zinc-900/70 p-4">
-                            <p className="text-xs text-zinc-500">
-                                Telemetry points
-                            </p>
-
-                            <p className="mt-1 text-xl font-semibold text-white">
-                                {points.length.toLocaleString()}
-                            </p>
-                        </div>
-
-                        {trackedMetrics
-                            .slice(0, 3)
-                            .map((metricKey) => {
-                                const metric =
-                                    telemetryMetrics[
-                                    metricKey
-                                    ];
-
-                                const value =
-                                    latest?.[
-                                    metricKey
-                                    ];
-
-                                return (
-                                    <div
-                                        key={metricKey}
-                                        className="rounded-2xl border border-white/5 bg-zinc-900/70 p-4"
-                                    >
-                                        <p className="text-xs text-zinc-500">
-                                            Current{" "}
-                                            {
-                                                metric.label
-                                            }
-                                        </p>
-
-                                        <p className="mt-1 text-xl font-semibold text-white">
-                                            {formatMetricValue(
-                                                value,
-                                                metric.unit
-                                            )}
-                                        </p>
-                                    </div>
-                                );
-                            })}
-                    </div>
 
                     <DndContext
                         collisionDetection={

@@ -24,7 +24,8 @@ class SessionCreate(BaseModel):
 class SessionResponse(BaseModel):
     id: str
     vehicle_id: str
-
+    vehicle_name: str
+    
     title: str
 
     selected_metrics: list[str] | None = None
