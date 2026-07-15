@@ -1,5 +1,6 @@
 import obd
 
+
 AVAILABLE_METRICS = {
     # Core driving data
     "rpm": {
@@ -58,6 +59,10 @@ AVAILABLE_METRICS = {
         "label": "Barometric Pressure",
         "command": obd.commands.BAROMETRIC_PRESSURE,
     },
+    "boost_psi": {
+        "label": "Boost Pressure",
+        "derived": True,
+    },
     "maf_gps": {
         "label": "Mass Air Flow",
         "command": obd.commands.MAF,
@@ -106,6 +111,7 @@ AVAILABLE_METRICS = {
     },
 }
 
+
 DEFAULT_METRICS = [
     "rpm",
     "speed_mph",
@@ -115,6 +121,7 @@ DEFAULT_METRICS = [
     "intake_temp_f",
     "intake_pressure_kpa",
     "barometric_pressure_kpa",
+    "boost_psi",
     "timing_advance_degrees",
     "battery_voltage",
 ]

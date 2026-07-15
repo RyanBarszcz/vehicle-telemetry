@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from csv_recorder import CsvRecorder
 from obd_reader import ObdReader
 from session_manifest import SessionManifest
+from metrics import AVAILABLE_METRICS
 
 
 API_URL = "http://127.0.0.1:8000"
@@ -258,6 +259,20 @@ def start_recording(
                 "At least one metric must "
                 "be selected."
             ),
+        )
+    
+    unknown_metrics = sorted(
+        set(request.selected_metrics)
+        - set(AVAILABLE_METRICS)
+    )
+
+    if unknown_metrics:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": "Unsupported telemetry metrics.",
+                "metrics": unknown_metrics,
+            },
         )
 
     if not request.auth_token.strip():

@@ -3,18 +3,17 @@
 import type { DrivingSession } from "@/lib/api";
 import type { LiveSessionStats, LiveTelemetryPoint } from "@/types/telemetry";
 import { formatDuration } from "@/lib/formatters";
+import DownloadSessionCsvButton from "@/components/sessions/DownloadSessionCsvButton";
 
 type SessionHeaderProps = {
     session: DrivingSession;
     liveStats: LiveSessionStats;
-    currentPoint: LiveTelemetryPoint | null;
     onEndSession?: () => void;
 };
 
 export default function SessionHeader({
     session,
     liveStats,
-    currentPoint,
     onEndSession,
 }: SessionHeaderProps) {
     const isActive = !session.ended_at;
@@ -40,23 +39,22 @@ export default function SessionHeader({
                         {new Date(session.started_at).toLocaleDateString()} •{" "}
                         {formatDuration(liveStats.duration_seconds)}
                     </p>
-
-                    {currentPoint && (
-                        <p className="mt-2 text-sm text-zinc-300">
-                            {isActive ? "Live" : "Final"}: {currentPoint.speed_mph} mph •{" "}
-                            {currentPoint.rpm.toLocaleString()} RPM
-                        </p>
-                    )}
                 </div>
 
-                {isActive && onEndSession && (
-                    <button
-                        onClick={onEndSession}
-                        className="rounded-full bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-500"
-                    >
-                        End Session
-                    </button>
-                )}
+                <div className="flex items-center gap-3">
+                    {isActive ? (
+                        onEndSession && (
+                            <button
+                                onClick={onEndSession}
+                                className="rounded-full bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-500"
+                            >
+                                End Session
+                            </button>
+                        )
+                    ) : (
+                        <DownloadSessionCsvButton sessionId={session.id} />
+                    )}
+                </div>
             </div>
         </section>
     );

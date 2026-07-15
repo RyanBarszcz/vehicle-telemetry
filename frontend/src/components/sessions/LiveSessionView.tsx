@@ -488,14 +488,13 @@ export default function LiveSessionView({
             <SessionHeader
                 session={session}
                 liveStats={liveStats}
-                currentPoint={currentPoint}
                 onEndSession={handleEndSession}
             />
-
+            {/* 
             <SessionStats
                 session={session}
                 liveStats={liveStats}
-            />
+            /> */}
 
             <section className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
                 <SessionChart

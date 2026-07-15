@@ -150,19 +150,7 @@ export default function HistoricalSessionView({
             <SessionHeader
                 session={session}
                 liveStats={liveStats}
-                currentPoint={currentPoint}
             />
-
-            <SessionStats
-                session={session}
-                liveStats={liveStats}
-            />
-
-            <div className="flex justify-end">
-                <DownloadSessionCsvButton
-                    sessionId={session.id}
-                />
-            </div>
 
             <section className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
                 {loadingTelemetry ? (
