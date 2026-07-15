@@ -28,7 +28,7 @@ export default function TrackingOptionsModal({ onConfirm }: Props) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
-            <div className="w-full max-w-2xl rounded-3xl border border-white/10 bg-zinc-950 p-6 text-white shadow-2xl">
+            <div className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-3xl border border-white/10 bg-zinc-950 p-6 text-white shadow-2xl">
                 <p className="text-sm font-medium text-blue-400">
                     Tracking Setup
                 </p>
@@ -42,43 +42,45 @@ export default function TrackingOptionsModal({ onConfirm }: Props) {
                     You can organize the charts after confirming.
                 </p>
 
-                <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                    {metricKeys.map((key) => {
-                        const metric = telemetryMetrics[key];
-                        const Icon = metric.icon;
-                        const active = selected.includes(key);
+                <div className="mt-6 flex-1 overflow-y-auto pr-2">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        {metricKeys.map((key) => {
+                            const metric = telemetryMetrics[key];
+                            const Icon = metric.icon;
+                            const active = selected.includes(key);
 
-                        return (
-                            <button
-                                key={key}
-                                type="button"
-                                onClick={() => toggleMetric(key)}
-                                className={`flex items-center justify-between rounded-2xl border p-4 text-left transition ${active
-                                    ? "border-blue-500/50 bg-blue-500/10"
-                                    : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"
-                                    }`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="rounded-xl bg-white/10 p-2">
-                                        <Icon className="h-5 w-5 text-blue-400" />
+                            return (
+                                <button
+                                    key={key}
+                                    type="button"
+                                    onClick={() => toggleMetric(key)}
+                                    className={`flex items-center justify-between rounded-2xl border p-4 text-left transition ${active
+                                        ? "border-blue-500/50 bg-blue-500/10"
+                                        : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"
+                                        }`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="rounded-xl bg-white/10 p-2">
+                                            <Icon className="h-5 w-5 text-blue-400" />
+                                        </div>
+
+                                        <div>
+                                            <p className="font-semibold">
+                                                {metric.label}
+                                            </p>
+                                            <p className="text-xs text-zinc-500">
+                                                {metric.unit}
+                                            </p>
+                                        </div>
                                     </div>
 
-                                    <div>
-                                        <p className="font-semibold">
-                                            {metric.label}
-                                        </p>
-                                        <p className="text-xs text-zinc-500">
-                                            {metric.unit}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                {active && (
-                                    <Check className="h-5 w-5 text-blue-400" />
-                                )}
-                            </button>
-                        );
-                    })}
+                                    {active && (
+                                        <Check className="h-5 w-5 text-blue-400" />
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
 
                 <button

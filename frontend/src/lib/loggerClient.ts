@@ -26,7 +26,14 @@ export type LoggerFilePair = {
 };
 
 export type LoggerStatus = {
+    is_connected: boolean;
+    is_connecting: boolean;
     is_recording: boolean;
+    connection_status:
+        | "idle"
+        | "connecting"
+        | "connected"
+        | "failed";
     session_id: string | null;
     vehicle_id: string | null;
     selected_metrics: string[];
@@ -57,6 +64,23 @@ async function getErrorMessage(
         return body.detail ?? fallback;
     } catch {
         return fallback;
+    }
+}
+
+export async function connectLogger(): Promise<void> {
+    const response = await fetch(
+        `${LOGGER_URL}/connect`,
+        {
+            method: "POST",
+        }
+    );
+
+    if (!response.ok) {
+        const errorText = await response.text();
+
+        throw new Error(
+            errorText || "Failed to connect logger."
+        );
     }
 }
 

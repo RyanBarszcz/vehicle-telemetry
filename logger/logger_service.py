@@ -48,12 +48,19 @@ class StartRequest(BaseModel):
 
 
 recording_thread: threading.Thread | None = None
+connection_thread: threading.Thread | None = None
+
+obd_reader: ObdReader | None = None
+
 stop_event = threading.Event()
 
 state_lock = threading.Lock()
 
 state: dict[str, Any] = {
+    "is_connected": False,
+    "is_connecting": False,
     "is_recording": False,
+    "connection_status": "idle",
     "session_id": None,
     "vehicle_id": None,
     "selected_metrics": [],
@@ -122,13 +129,17 @@ def upload_finished_run(
 
 
 def recording_loop(request: StartRequest) -> None:
-    reader: ObdReader | None = None
+    global obd_reader
+    
     recorder: CsvRecorder | None = None
 
     try:
-        reader = ObdReader(
-            request.selected_metrics
-        )
+        if obd_reader is None:
+            raise RuntimeError(
+                "OBD-II adapter is not connected."
+            )
+
+        reader = obd_reader
 
         recorder = CsvRecorder(
             selected_metrics=
@@ -225,6 +236,36 @@ def recording_loop(request: StartRequest) -> None:
             is_recording=False,
         )
 
+def connect_obd_loop() -> None:
+    global obd_reader
+
+    try:
+        update_state(
+            is_connecting=True,
+            is_connected=False,
+            connection_status="connecting",
+            error=None,
+        )
+
+        obd_reader = ObdReader([])
+
+        update_state(
+            is_connecting=False,
+            is_connected=True,
+            connection_status="connected",
+            error=None,
+        )
+
+    except Exception as error:
+        obd_reader = None
+
+        update_state(
+            is_connecting=False,
+            is_connected=False,
+            connection_status="failed",
+            error=str(error),
+        )
+
 
 @app.get("/health")
 def health() -> dict[str, str]:
@@ -237,14 +278,53 @@ def health() -> dict[str, str]:
 def status() -> dict[str, Any]:
     return get_state_snapshot()
 
+@app.post("/connect")
+def connect_obd() -> dict[str, str]:
+    global connection_thread
+
+    current_state = get_state_snapshot()
+
+    if current_state["is_connected"]:
+        return {
+            "message": "OBD-II adapter is already connected.",
+        }
+
+    if current_state["is_connecting"]:
+        return {
+            "message": "OBD-II connection is already in progress.",
+        }
+
+    connection_thread = threading.Thread(
+        target=connect_obd_loop,
+        daemon=True,
+        name="obd-connection",
+    )
+
+    connection_thread.start()
+
+    return {
+        "message": "OBD-II connection started.",
+    }
+
 
 @app.post("/start")
 def start_recording(
     request: StartRequest,
 ) -> dict[str, str]:
     global recording_thread
+    global odb_reader
 
     current_state = get_state_snapshot()
+
+    if not current_state["is_connected"] or obd_reader is None:
+        raise HTTPException(
+            status_code=409,
+            detail="OBD-II adapter is not connected.",
+        )
+
+    obd_reader.set_selected_metrics(
+        request.selected_metrics
+    )
 
     if current_state["is_recording"]:
         raise HTTPException(
@@ -283,6 +363,9 @@ def start_recording(
                 "is required."
             ),
         )
+    
+    print("Received selected metrics:")
+    print(request.selected_metrics)
 
     stop_event.clear()
 
