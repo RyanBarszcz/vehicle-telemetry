@@ -11,7 +11,9 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import {
+    connectLogger,
     getLoggerStatus,
+    startLoggerSession,
     stopLoggerSession,
 } from "@/lib/loggerClient";
 
@@ -20,6 +22,7 @@ import SessionStats from "@/components/sessions/SessionStats";
 import SessionChart from "@/components/sessions/SessionChart";
 import EndSessionModal from "@/components/sessions/EndSessionModal";
 import TrackingOptionsModal from "@/components/sessions/TrackingOptionsModal";
+import ObdConnectionModal from "@/components/sessions/ObdConnectionModal";
 
 import {
     endSession,
@@ -117,6 +120,113 @@ export default function LiveSessionView({
             telemetry_count: 0,
             speed_sum_mph: 0,
         });
+    const [connectionStatus, setConnectionStatus] =
+        useState<
+            "connecting" | "connected" | "failed"
+        >("connecting");
+
+    const [connectionStartedAt] =
+        useState(() => Date.now());
+
+    const [connectionError, setConnectionError] =
+        useState<string | null>(null);
+
+    useEffect(() => {
+        if (session.ended_at) {
+            return;
+        }
+
+        let cancelled = false;
+        let intervalId: number | null = null;
+
+        async function beginConnection() {
+            try {
+                setConnectionStatus("connecting");
+                setConnectionError(null);
+
+                await connectLogger();
+
+                intervalId = window.setInterval(
+                    async () => {
+                        try {
+                            const status =
+                                await getLoggerStatus();
+
+                            if (cancelled) {
+                                return;
+                            }
+
+                            if (status.is_connected) {
+                                setConnectionStatus(
+                                    "connected"
+                                );
+
+                                if (
+                                    intervalId !== null
+                                ) {
+                                    window.clearInterval(
+                                        intervalId
+                                    );
+                                }
+
+                                return;
+                            }
+
+                            if (
+                                status.connection_status ===
+                                "failed"
+                            ) {
+                                setConnectionStatus(
+                                    "failed"
+                                );
+
+                                setConnectionError(
+                                    status.error ??
+                                    "Failed to connect to OBD-II."
+                                );
+
+                                if (
+                                    intervalId !== null
+                                ) {
+                                    window.clearInterval(
+                                        intervalId
+                                    );
+                                }
+                            }
+                        } catch (error) {
+                            console.error(
+                                "Failed to poll OBD connection",
+                                error
+                            );
+                        }
+                    },
+                    500
+                );
+            } catch (error) {
+                if (cancelled) {
+                    return;
+                }
+
+                setConnectionStatus("failed");
+
+                setConnectionError(
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to begin OBD connection."
+                );
+            }
+        }
+
+        void beginConnection();
+
+        return () => {
+            cancelled = true;
+
+            if (intervalId !== null) {
+                window.clearInterval(intervalId);
+            }
+        };
+    }, [session.ended_at]);
 
     /*
      * performance.now() is used for elapsed time because it
@@ -509,19 +619,86 @@ export default function LiveSessionView({
             </section>
 
 
-            {!trackingConfirmed &&
+            {connectionStatus === "connecting" &&
                 !session.ended_at && (
-                    <TrackingOptionsModal
-                        onConfirm={(metrics) => {
-                            setTrackedMetrics(
-                                metrics
-                            );
-                            setTrackingConfirmed(
-                                true
-                            );
-                        }}
+                    <ObdConnectionModal
+                        startedAt={connectionStartedAt}
                     />
                 )}
+
+            {connectionStatus === "failed" &&
+                !session.ended_at && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+                        <div className="w-full max-w-md rounded-3xl border border-red-500/20 bg-zinc-950 p-8 text-center text-white shadow-2xl">
+                            <h2 className="text-xl font-bold">
+                                OBD connection failed
+                            </h2>
+
+                            <p className="mt-3 text-sm text-red-300">
+                                {connectionError ??
+                                    "Unable to connect to the OBD-II adapter."}
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+            {connectionStatus === "connected" &&
+                !trackingConfirmed &&
+                !session.ended_at && (
+                    <TrackingOptionsModal
+                        onConfirm={async (metrics) => {
+                            const toastId = toast.loading(
+                                "Starting telemetry..."
+                            );
+
+                            try {
+                                const token =
+                                    await getToken();
+
+                                if (!token) {
+                                    throw new Error(
+                                        "Please sign in before tracking."
+                                    );
+                                }
+
+                                await startLoggerSession({
+                                    session_id: session.id,
+                                    vehicle_id:
+                                        session.vehicle_id,
+                                    selected_metrics:
+                                        metrics,
+                                    sample_rate: 5,
+                                    auth_token: token,
+                                });
+
+                                setTrackedMetrics(metrics);
+                                setTrackingConfirmed(true);
+
+                                toast.success(
+                                    "Telemetry tracking started.",
+                                    {
+                                        id: toastId,
+                                    }
+                                );
+                            } catch (error) {
+                                console.error(
+                                    "Failed to start logger",
+                                    error
+                                );
+
+                                toast.error(
+                                    error instanceof Error
+                                        ? error.message
+                                        : "Failed to start telemetry.",
+                                    {
+                                        id: toastId,
+                                    }
+                                );
+                            }
+                        }}
+                    />
+                )
+            }
 
             {showEndModal && (
                 <EndSessionModal
