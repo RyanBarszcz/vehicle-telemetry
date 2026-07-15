@@ -336,6 +336,110 @@ export async function uploadSessionCsv(
   return res.json();
 }
 
+export async function getSessionCsvTelemetry(
+    token: string,
+    sessionId: string
+): Promise<LiveTelemetryPoint[]> {
+    const response = await fetch(
+        `${API_URL}/sessions/${sessionId}/telemetry-csv`,
+        {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        }
+    );
+
+    if (!response.ok) {
+        const errorText =
+            await response.text();
+
+        console.error(
+            "Historical CSV telemetry failed:",
+            response.status,
+            errorText
+        );
+
+        throw new Error(
+            response.status === 404
+                ? "No telemetry CSV was found for this session."
+                : "Failed to load recorded telemetry."
+        );
+    }
+
+    return response.json();
+}
+
+export async function downloadSessionCsv(
+    token: string,
+    sessionId: string
+): Promise<{
+    blob: Blob;
+    filename: string;
+}> {
+    const response = await fetch(
+        `${API_URL}/sessions/${sessionId}/download-csv`,
+        {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        }
+    );
+
+    if (!response.ok) {
+        const errorText = await response.text();
+
+        console.error(
+            "Download session CSV failed:",
+            response.status,
+            errorText
+        );
+
+        throw new Error(
+            response.status === 404
+                ? "No CSV file was found for this session."
+                : "Failed to download session CSV."
+        );
+    }
+
+    const disposition = response.headers.get(
+        "content-disposition"
+    );
+
+    const filename =
+        getFilenameFromContentDisposition(
+            disposition
+        ) ?? `session-${sessionId}.csv`;
+
+    return {
+        blob: await response.blob(),
+        filename,
+    };
+}
+
+function getFilenameFromContentDisposition(
+    disposition: string | null
+): string | null {
+    if (!disposition) {
+        return null;
+    }
+
+    const utf8Match = disposition.match(
+        /filename\*=UTF-8''([^;]+)/
+    );
+
+    if (utf8Match?.[1]) {
+        return decodeURIComponent(
+            utf8Match[1]
+        );
+    }
+
+    const regularMatch = disposition.match(
+        /filename="?([^"]+)"?/
+    );
+
+    return regularMatch?.[1] ?? null;
+}
+
 // =====================
 // Telemetry Legacy DB Routes
 // =====================

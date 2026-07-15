@@ -5,6 +5,7 @@ import { CalendarDays, Gauge, Timer, Route, ArrowRight } from "lucide-react";
 import { formatDuration } from "@/lib/formatters";
 
 import { getSessions } from "@/lib/api";
+import DownloadSessionCsvButton from "@/components/sessions/DownloadSessionCsvButton";
 
 function formatDate(date: string) {
     return new Intl.DateTimeFormat("en-US", {
@@ -80,13 +81,15 @@ export default async function SessionsPage() {
                 ) : (
                     <div className="grid gap-4">
                         {sessions.map((session) => (
-                            <Link
+                            <div
                                 key={session.id}
-                                href={`/sessions/${session.id}`}
-                                className="group rounded-3xl border border-white/10 bg-white/[0.03] p-6 transition hover:border-blue-500/40 hover:bg-white/[0.06]"
+                                className="group relative rounded-3xl border border-white/10 bg-white/[0.03] p-6 transition hover:border-blue-500/40 hover:bg-white/[0.06]"
                             >
                                 <div className="flex flex-col justify-between gap-5 md:flex-row md:items-center">
-                                    <div>
+                                    <Link
+                                        href={`/sessions/${session.id}`}
+                                        className="min-w-0 flex-1"
+                                    >
                                         <div className="flex items-center gap-3">
                                             <div className="rounded-2xl bg-blue-500/10 p-3 text-blue-400">
                                                 <Gauge className="h-5 w-5" />
@@ -94,25 +97,35 @@ export default async function SessionsPage() {
 
                                             <div>
                                                 <h2 className="text-xl font-semibold text-white">
-                                                    {session.title || "Driving Session"}
+                                                    {session.title ||
+                                                        "Driving Session"}
                                                 </h2>
 
                                                 <p className="mt-1 flex items-center gap-2 text-sm text-zinc-400">
                                                     <CalendarDays className="h-4 w-4" />
-                                                    {formatDate(session.started_at)}
+
+                                                    {formatDate(
+                                                        session.started_at
+                                                    )}
                                                 </p>
                                             </div>
                                         </div>
-                                    </div>
+                                    </Link>
 
-                                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 md:min-w-[520px]">
+                                    <Link
+                                        href={`/sessions/${session.id}`}
+                                        className="grid flex-1 grid-cols-2 gap-4 sm:grid-cols-4 md:min-w-[520px]"
+                                    >
                                         <div>
                                             <p className="flex items-center gap-1 text-xs text-zinc-500">
                                                 <Timer className="h-3.5 w-3.5" />
                                                 Duration
                                             </p>
+
                                             <p className="mt-1 font-semibold">
-                                                {formatDuration(session.duration_seconds)}
+                                                {formatDuration(
+                                                    session.duration_seconds
+                                                )}
                                             </p>
                                         </div>
 
@@ -120,8 +133,12 @@ export default async function SessionsPage() {
                                             <p className="text-xs text-zinc-500">
                                                 Max Speed
                                             </p>
+
                                             <p className="mt-1 font-semibold">
-                                                {session.max_speed_mph} mph
+                                                {Math.round(
+                                                    session.max_speed_mph
+                                                )}{" "}
+                                                mph
                                             </p>
                                         </div>
 
@@ -129,8 +146,11 @@ export default async function SessionsPage() {
                                             <p className="text-xs text-zinc-500">
                                                 Max RPM
                                             </p>
+
                                             <p className="mt-1 font-semibold">
-                                                {session.max_rpm.toLocaleString()}
+                                                {Math.round(
+                                                    session.max_rpm
+                                                ).toLocaleString()}
                                             </p>
                                         </div>
 
@@ -139,17 +159,37 @@ export default async function SessionsPage() {
                                                 <Route className="h-3.5 w-3.5" />
                                                 Distance
                                             </p>
+
                                             <p className="mt-1 font-semibold">
                                                 {session.distance_miles
-                                                    ? `${session.distance_miles.toFixed(1)} mi`
+                                                    ? `${session.distance_miles.toFixed(
+                                                        1
+                                                    )} mi`
                                                     : "—"}
                                             </p>
                                         </div>
-                                    </div>
+                                    </Link>
 
-                                    <ArrowRight className="hidden h-5 w-5 text-zinc-500 transition group-hover:translate-x-1 group-hover:text-blue-400 md:block" />
+                                    <div className="flex items-center justify-end gap-2">
+                                        {session.ended_at && (
+                                            <DownloadSessionCsvButton
+                                                sessionId={session.id}
+                                                compact
+                                            />
+                                        )}
+
+                                        <Link
+                                            href={`/sessions/${session.id}`}
+                                            aria-label={`Open ${session.title ||
+                                                "driving session"
+                                                }`}
+                                            className="rounded-full p-2 text-zinc-500 transition hover:bg-white/10 hover:text-blue-400"
+                                        >
+                                            <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
+                                        </Link>
+                                    </div>
                                 </div>
-                            </Link>
+                            </div>
                         ))}
                     </div>
                 )}
