@@ -20,7 +20,7 @@ function formatDate(date: string) {
     }).format(new Date(date));
 }
 
-// TODO: Add a delete option
+// TODO: Later add a delete option
 
 export default async function SessionsPage() {
     const { userId, getToken } = await auth();

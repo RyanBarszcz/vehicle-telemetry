@@ -2,46 +2,55 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useAuth } from "@clerk/nextjs";
-import { Activity, BarChart3, Gauge, ShieldCheck } from "lucide-react";
-import { useUser } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
 
-import MetricCard from "@/components/telemetry/MetricCard";
-import DashboardVehicle from "./DashboardVehicle";
 import DashboardSession from "./DashboardSession";
-import { getDashboardSummary, type DashboardSummary } from "@/lib/api";
+import DashboardVehicle from "./DashboardVehicle";
+import {
+    getDashboardSummary,
+    type DashboardSummary,
+} from "@/lib/api";
+import { formatDuration } from "@/lib/formatters";
 
 export default function SignedInHome() {
     const { getToken } = useAuth();
-    const { user, isLoaded } = useUser();
+    const { user, isLoaded: isUserLoaded } = useUser();
 
-    const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
+    const [dashboard, setDashboard] =
+        useState<DashboardSummary | null>(null);
     const [loading, setLoading] = useState(true);
-
 
     useEffect(() => {
         async function loadDashboard() {
             try {
                 const token = await getToken();
 
-                if (!token) return;
+                if (!token) {
+                    setDashboard(null);
+                    return;
+                }
 
                 const data = await getDashboardSummary(token);
                 setDashboard(data);
             } catch (error) {
-                console.error(error);
+                console.error("Failed to load dashboard:", error);
+                setDashboard(null);
             } finally {
                 setLoading(false);
             }
         }
 
-        loadDashboard();
+        void loadDashboard();
     }, [getToken]);
 
-    if (loading) {
+    if (loading || !isUserLoaded) {
         return (
             <main className="min-h-screen bg-zinc-950 px-6 py-10 text-white">
-                <p className="text-sm text-zinc-400">Loading dashboard...</p>
+                <div className="mx-auto max-w-7xl">
+                    <p className="text-sm text-zinc-400">
+                        Loading dashboard...
+                    </p>
+                </div>
             </main>
         );
     }
@@ -49,15 +58,22 @@ export default function SignedInHome() {
     if (!dashboard) {
         return (
             <main className="min-h-screen bg-zinc-950 px-6 py-10 text-white">
-                <p className="text-sm text-zinc-400">
-                    Unable to load dashboard.
-                </p>
+                <div className="mx-auto max-w-7xl">
+                    <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-8">
+                        <h1 className="text-2xl font-semibold">
+                            Unable to load dashboard
+                        </h1>
+
+                        <p className="mt-2 text-sm text-zinc-400">
+                            Refresh the page and try again.
+                        </p>
+                    </div>
+                </div>
             </main>
         );
     }
 
-
-    if (!isLoaded) return null;
+    const firstName = user?.firstName || "Driver";
 
     return (
         <main className="min-h-screen bg-zinc-950 px-6 py-10 text-white">
@@ -69,12 +85,12 @@ export default function SignedInHome() {
                         </p>
 
                         <h1 className="mt-2 text-4xl font-bold">
-                            Welcome back, {user?.firstName}.
+                            Welcome back, {firstName}.
                         </h1>
 
                         <p className="mt-3 max-w-2xl text-zinc-400">
-                            Monitor your garage, start a live telemetry session,
-                            or review your latest driving data.
+                            Monitor your garage, start a live telemetry
+                            session, or review your latest driving data.
                         </p>
                     </div>
 
@@ -95,39 +111,19 @@ export default function SignedInHome() {
                     </div>
                 </section>
 
-                <section className="mt-8 grid gap-4 md:grid-cols-4">
-                    <MetricCard
-                        label="Vehicles"
-                        value={dashboard.vehicle_count.toString()}
-                        icon={<Gauge />}
-                    />
-
-                    <MetricCard
-                        label="Sessions"
-                        value={dashboard.session_count.toString()}
-                        icon={<Activity />}
-                    />
-
-                    <MetricCard
-                        label="Miles Logged"
-                        value={dashboard.miles_logged.toFixed(1)}
-                        icon={<BarChart3 />}
-                    />
-
-                    <MetricCard
-                        label="Active Alerts"
-                        value={dashboard.active_alert_count.toString()}
-                        icon={<ShieldCheck />}
-                    />
-                </section>
-
                 <section className="mt-8 grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
                     <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
-                        <div className="mb-5 flex items-center justify-between">
+                        <div className="mb-5 flex items-start justify-between gap-4">
                             <div>
-                                <h2 className="text-2xl font-semibold">
-                                    Your Garage
-                                </h2>
+                                <div className="flex items-center gap-3">
+                                    <h2 className="text-2xl font-semibold">
+                                        Your Garage
+                                    </h2>
+
+                                    <span className="rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1 text-xs font-medium text-zinc-300">
+                                        {dashboard.vehicle_count}
+                                    </span>
+                                </div>
 
                                 <p className="mt-1 text-sm text-zinc-400">
                                     Vehicles connected to your account.
@@ -136,7 +132,7 @@ export default function SignedInHome() {
 
                             <Link
                                 href="/garage"
-                                className="text-sm font-medium text-blue-400 hover:text-blue-300"
+                                className="shrink-0 text-sm font-medium text-blue-400 transition hover:text-blue-300"
                             >
                                 View all
                             </Link>
@@ -144,55 +140,104 @@ export default function SignedInHome() {
 
                         <div className="space-y-4">
                             {dashboard.vehicles.length === 0 ? (
-                                <p className="text-sm text-zinc-400">
-                                    No vehicles yet. Add your first vehicle to
-                                    start logging sessions.
-                                </p>
+                                <div className="rounded-2xl border border-dashed border-white/10 p-6">
+                                    <p className="text-sm text-zinc-400">
+                                        No vehicles yet. Add your first
+                                        vehicle to start logging sessions.
+                                    </p>
+
+                                    <Link
+                                        href="/garage/new"
+                                        className="mt-4 inline-flex text-sm font-medium text-blue-400 transition hover:text-blue-300"
+                                    >
+                                        Add a vehicle
+                                    </Link>
+                                </div>
                             ) : (
                                 dashboard.vehicles.map((vehicle) => (
-                                    <DashboardVehicle
+                                    <Link
                                         key={vehicle.id}
-                                        name={vehicle.name}
-                                        subtitle={`${vehicle.year ?? ""} ${vehicle.make
-                                            } ${vehicle.model}`}
-                                        status="Ready"
-                                    />
+                                        href={`/vehicles/${vehicle.id}`}
+                                        className="block rounded-2xl transition hover:bg-white/[0.03]"
+                                    >
+                                        <DashboardVehicle
+                                            name={vehicle.name}
+                                            subtitle={[
+                                                vehicle.year,
+                                                vehicle.make,
+                                                vehicle.model,
+                                            ]
+                                                .filter(Boolean)
+                                                .join(" ")}
+                                            status="Ready"
+                                        />
+                                    </Link>
                                 ))
                             )}
                         </div>
                     </div>
 
                     <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
-                        <div className="mb-5">
-                            <h2 className="text-2xl font-semibold">
-                                Recent Sessions
-                            </h2>
+                        <div className="mb-5 flex items-start justify-between gap-4">
+                            <div>
+                                <div className="flex items-center gap-3">
+                                    <h2 className="text-2xl font-semibold">
+                                        Recent Sessions
+                                    </h2>
 
-                            <p className="mt-1 text-sm text-zinc-400">
-                                Latest driving logs and analytics.
-                            </p>
+                                    <span className="rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1 text-xs font-medium text-zinc-300">
+                                        {dashboard.session_count}
+                                    </span>
+                                </div>
+
+                                <p className="mt-1 text-sm text-zinc-400">
+                                    Your latest completed driving logs.
+                                </p>
+                            </div>
+
+                            <Link
+                                href="/sessions"
+                                className="shrink-0 text-sm font-medium text-blue-400 transition hover:text-blue-300"
+                            >
+                                View all
+                            </Link>
                         </div>
 
                         <div className="space-y-4">
                             {dashboard.recent_sessions.length === 0 ? (
-                                <p className="text-sm text-zinc-400">
-                                    No sessions yet. Start a session from your
-                                    garage.
-                                </p>
+                                <div className="rounded-2xl border border-dashed border-white/10 p-6">
+                                    <p className="text-sm text-zinc-400">
+                                        No sessions yet. Start a session
+                                        from your garage.
+                                    </p>
+
+                                    <Link
+                                        href="/garage"
+                                        className="mt-4 inline-flex text-sm font-medium text-blue-400 transition hover:text-blue-300"
+                                    >
+                                        Open garage
+                                    </Link>
+                                </div>
                             ) : (
                                 dashboard.recent_sessions.map((session) => (
-                                    <DashboardSession
+                                    <Link
                                         key={session.id}
-                                        title={session.title}
-                                        vehicle={session.vehicle_name}
-                                        stats={`${Math.floor(
-                                            session.duration_seconds / 60
-                                        )} min • ${session.distance_miles?.toFixed(1) ??
-                                        "0.0"
-                                            } mi • ${Math.round(
-                                                session.max_speed_mph
-                                            )} mph max`}
-                                    />
+                                        href={`/sessions/${session.id}`}
+                                        className="block rounded-2xl transition hover:bg-white/[0.03]"
+                                    >
+                                        <DashboardSession
+                                            title={
+                                                session.title ||
+                                                "Driving Session"
+                                            }
+                                            vehicle={
+                                                session.vehicle_name
+                                            }
+                                            stats={formatDuration(
+                                                session.duration_seconds
+                                            )}
+                                        />
+                                    </Link>
                                 ))
                             )}
                         </div>

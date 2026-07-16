@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# TODO: Make sure routes are protected with prev stuff
 
 app.add_middleware(
     CORSMiddleware,

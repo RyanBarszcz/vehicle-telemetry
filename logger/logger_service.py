@@ -21,7 +21,7 @@ app = FastAPI(
     title="Vehicle Telemetry Logger Service"
 )
 
-# TODO: Change origin to frontend and i think the other is backend
+# TODO: Change origin to frontend and I think the other is backend
 
 app.add_middleware(
     CORSMiddleware,
