@@ -1,6 +1,28 @@
 const LOGGER_URL =
     process.env.NEXT_PUBLIC_LOGGER_URL ??
-    "http://localhost:8765";
+    "http://127.0.0.1:8765";
+
+export async function checkLoggerHealth(): Promise<boolean> {
+    try {
+        const controller = new AbortController();
+
+        const timeoutId = window.setTimeout(() => {
+            controller.abort();
+        }, 2000);
+
+        const response = await fetch(`${LOGGER_URL}/health`, {
+            method: "GET",
+            signal: controller.signal,
+            cache: "no-store",
+        });
+
+        window.clearTimeout(timeoutId);
+
+        return response.ok;
+    } catch {
+        return false;
+    }
+}
 
 export type LoggerPointValue =
     | string

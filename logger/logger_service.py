@@ -11,9 +11,9 @@ from csv_recorder import CsvRecorder
 from obd_reader import ObdReader
 from session_manifest import SessionManifest
 from metrics import AVAILABLE_METRICS
+from config import API_URL, FRONTEND_ORIGINS
 
 
-API_URL = "http://127.0.0.1:8000"
 UPLOAD_TIMEOUT_SECONDS = 30
 STOP_TIMEOUT_SECONDS = UPLOAD_TIMEOUT_SECONDS + 10
 
@@ -25,10 +25,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=FRONTEND_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -312,7 +309,7 @@ def start_recording(
     request: StartRequest,
 ) -> dict[str, str]:
     global recording_thread
-    global odb_reader
+    global obd_reader
 
     current_state = get_state_snapshot()
 
