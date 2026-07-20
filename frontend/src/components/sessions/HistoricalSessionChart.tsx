@@ -645,8 +645,12 @@ function HistoricalChartCard({
     const metric =
         telemetryMetrics[metricKey];
 
+    const latestPoint = data[data.length - 1];
+
     const latestVisibleValue =
-        data[data.length - 1]?.[metricKey];
+        latestPoint && metricKey in latestPoint
+            ? latestPoint[metricKey as keyof ChartDataPoint]
+            : null;
 
     const {
         attributes,
