@@ -1,55 +1,101 @@
+from functools import lru_cache
+from typing import Any
+
 import requests
-from fastapi import Depends, HTTPException
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import jwt
+from fastapi import Depends, HTTPException, status
+from fastapi.security import (
+    HTTPAuthorizationCredentials,
+    HTTPBearer,
+)
+from jose import JWTError, jwt
 
 from app.core.config import settings
 
 security = HTTPBearer()
 
-_jwks_cache = None
+
+@lru_cache(maxsize=1)
+def get_jwks() -> dict[str, Any]:
+    response = requests.get(
+        settings.CLERK_JWKS_URL,
+        timeout=10,
+    )
+    response.raise_for_status()
+
+    return response.json()
 
 
-def get_jwks():
-    global _jwks_cache
-
-    if _jwks_cache is None:
-        response = requests.get(settings.CLERK_JWKS_URL)
-        response.raise_for_status()
-        _jwks_cache = response.json()
-
-    return _jwks_cache
-
-
-def get_current_clerk_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-):
+def get_clerk_user_id(
+    credentials: HTTPAuthorizationCredentials = Depends(
+        security
+    ),
+) -> str:
     token = credentials.credentials
 
     try:
-        headers = jwt.get_unverified_header(token)
-        kid = headers.get("kid")
+        token_header = jwt.get_unverified_header(token)
+        key_id = token_header.get("kid")
+
+        if not key_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication token",
+            )
 
         jwks = get_jwks()
-        key = next(
-            (key for key in jwks["keys"] if key["kid"] == kid),
+
+        signing_key = next(
+            (
+                key
+                for key in jwks.get("keys", [])
+                if key.get("kid") == key_id
+            ),
             None,
         )
 
-        if key is None:
-            raise HTTPException(status_code=401, detail="Invalid token key")
+        if signing_key is None:
+            get_jwks.cache_clear()
+            jwks = get_jwks()
+
+            signing_key = next(
+                (
+                    key
+                    for key in jwks.get("keys", [])
+                    if key.get("kid") == key_id
+                ),
+                None,
+            )
+
+        if signing_key is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication token",
+            )
 
         payload = jwt.decode(
             token,
-            key,
+            signing_key,
             algorithms=["RS256"],
             issuer=settings.CLERK_ISSUER,
-            options={"verify_aud": False},
+            options={
+                "verify_aud": False,
+            },
         )
 
-        return {
-            "clerk_id": payload["sub"],
-        }
+        clerk_user_id = payload.get("sub")
 
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid authentication token")
+        if not clerk_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication token",
+            )
+
+        return clerk_user_id
+
+    except HTTPException:
+        raise
+    except (JWTError, requests.RequestException, KeyError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token",
+        )

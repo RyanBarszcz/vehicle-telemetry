@@ -19,7 +19,7 @@ from app.database import get_db
 from app.models.session import DrivingSession
 from app.models.user import User
 from app.models.vehicle import GarageVehicle, Vehicle
-from app.routes.auth import get_clerk_user_id
+from app.core.auth import get_clerk_user_id
 from app.services.s3_service import (
     download_session_csv_from_s3,
     upload_session_csv as upload_csv_to_s3,

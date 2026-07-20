@@ -6,7 +6,7 @@ from app.models.session import DrivingSession
 from app.database import get_db
 from app.models.user import User
 from app.models.vehicle import GarageVehicle, Vehicle
-from app.routes.auth import get_clerk_user_id
+from app.core.auth import get_clerk_user_id
 from app.schemas.vehicle import VehicleCreate, VehicleResponse, VehicleUpdate
 
 router = APIRouter(prefix="/vehicles", tags=["Vehicles"])

@@ -9,7 +9,7 @@ from app.models.session import DrivingSession
 from app.models.telemetry import TelemetryPoint
 from app.models.user import User
 from app.models.vehicle import GarageVehicle, Vehicle
-from app.routes.auth import get_clerk_user_id
+from app.core.auth import get_clerk_user_id
 from app.schemas.session import (
     SessionCreate,
     SessionEndUpdate,

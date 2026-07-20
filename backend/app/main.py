@@ -1,3 +1,7 @@
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -5,10 +9,6 @@ from app.core.config import settings
 from app.routes import auth, dashboard, sessions, telemetry, vehicles, session_files
 
 app = FastAPI(title="Vehicle Telemetry API")
-
-from dotenv import load_dotenv
-
-load_dotenv()
 
 
 app.add_middleware(
