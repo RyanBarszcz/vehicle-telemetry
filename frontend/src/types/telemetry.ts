@@ -1,3 +1,5 @@
+import { TelemetryMetricKey } from "@/lib/telemetryMetrics";
+
 export type TelemetryPoint = {
   timestamp: string;
 
@@ -19,15 +21,13 @@ export type TelemetryPoint = {
 };
 
 export type LiveTelemetryPoint = {
-    id: string;
-    sessionId: string;
     timestamp: string;
-    speed_mph: number;
-    rpm: number;
-    throttle_percent: number;
-    coolant_temp_f: number;
-    boost_psi?: number | null;
-};
+} & Partial <
+    Record <
+        TelemetryMetricKey,
+        number | null
+    >
+>;
 
 export type LiveSessionStats = {
     duration_seconds: number;

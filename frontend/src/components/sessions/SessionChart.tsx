@@ -33,25 +33,20 @@ type SessionChartProps = {
     sessionId: string;
     points: LiveTelemetryPoint[];
     currentPoint: LiveTelemetryPoint | null;
-    trackedMetrics: ChartMetricKey[];
+    trackedMetrics: TelemetryMetricKey[];
     onReorderMetrics: (
-        metrics: ChartMetricKey[]
+        metrics: TelemetryMetricKey[]
     ) => void;
 };
 
 type ChartDataPoint = {
     index: number;
     time: string;
-    speed_mph: number;
-    rpm: number;
-    throttle_percent: number;
-    coolant_temp_f: number;
-    boost_psi: number;
-};
-
-type ChartMetricKey = keyof Omit<
-    ChartDataPoint,
-    "index" | "time"
+} & Partial<
+    Record<
+        TelemetryMetricKey,
+        number | null
+    >
 >;
 
 export default function SessionChart({
@@ -68,26 +63,28 @@ export default function SessionChart({
     const visiblePoints = points.slice(-720);
 
     const chartData: ChartDataPoint[] =
-        visiblePoints.map((point, index) => ({
-            index:
-                points.length -
-                visiblePoints.length +
-                index +
-                1,
-            time: new Date(
-                point.timestamp
-            ).toLocaleTimeString([], {
-                minute: "2-digit",
-                second: "2-digit",
-            }),
-            speed_mph: point.speed_mph,
-            rpm: point.rpm,
-            throttle_percent:
-                point.throttle_percent,
-            coolant_temp_f:
-                point.coolant_temp_f,
-            boost_psi: point.boost_psi ?? 0,
-        }));
+        visiblePoints.map((point, index) => {
+            const chartPoint: ChartDataPoint = {
+                index:
+                    points.length -
+                    visiblePoints.length +
+                    index +
+                    1,
+                time: new Date(
+                    point.timestamp
+                ).toLocaleTimeString([], {
+                    minute: "2-digit",
+                    second: "2-digit",
+                }),
+            };
+
+            for (const metricKey of trackedMetrics) {
+                chartPoint[metricKey] =
+                    point[metricKey] ?? null;
+            }
+
+            return chartPoint;
+        });
 
     function handleDragEnd(
         event: DragEndEvent
@@ -100,12 +97,12 @@ export default function SessionChart({
 
         const oldIndex =
             trackedMetrics.indexOf(
-                active.id as ChartMetricKey
+                active.id as TelemetryMetricKey
             );
 
         const newIndex =
             trackedMetrics.indexOf(
-                over.id as ChartMetricKey
+                over.id as TelemetryMetricKey
             );
 
         if (
@@ -172,12 +169,7 @@ export default function SessionChart({
                                                 chartData
                                             }
                                             latestValue={
-                                                latest
-                                                    ? getNumericMetricValue(
-                                                        latest,
-                                                        metricKey
-                                                    )
-                                                    : null
+                                                latest?.[metricKey]
                                             }
                                         />
                                     )
@@ -437,13 +429,13 @@ function formatMetricValue(
     return `${numericValue} ${unit}`;
 }
 
-function getNumericMetricValue(
-    point: LiveTelemetryPoint,
-    metricKey: ChartMetricKey
-): number | null | undefined {
-    const value = point[metricKey];
+// function getNumericMetricValue(
+//     point: LiveTelemetryPoint,
+//     metricKey: ChartMetricKey
+// ): number | null | undefined {
+//     const value = point[metricKey];
 
-    return typeof value === "number"
-        ? value
-        : null;
-}
+//     return typeof value === "number"
+//         ? value
+//         : null;
+// }

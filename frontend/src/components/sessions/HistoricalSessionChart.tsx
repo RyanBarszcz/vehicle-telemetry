@@ -1,7 +1,7 @@
 "use client";
 
 import {
-    useEffect,
+    // useEffect,
     useMemo,
     useState,
     type WheelEvent,
@@ -53,12 +53,12 @@ type ChartDataPoint = {
     timestamp: string;
     elapsedSeconds: number;
     elapsedLabel: string;
-    speed_mph: number;
-    rpm: number;
-    throttle_percent: number;
-    coolant_temp_f: number;
-    boost_psi: number | null;
-};
+} & Partial<
+    Record<
+        TelemetryMetricKey,
+        number | null
+    >
+>;
 
 type VisibleRange = {
     startIndex: number;
@@ -89,22 +89,22 @@ export default function HistoricalSessionChart({
                 (timestamp - firstTimestamp) / 1000
             );
 
-            return {
+            const chartPoint: ChartDataPoint = {
                 index,
                 timestamp: point.timestamp,
                 elapsedSeconds,
                 elapsedLabel:
                     formatElapsedTime(elapsedSeconds),
-                speed_mph: point.speed_mph,
-                rpm: point.rpm,
-                throttle_percent:
-                    point.throttle_percent,
-                coolant_temp_f:
-                    point.coolant_temp_f,
-                boost_psi: point.boost_psi ?? null,
             };
+
+            for (const metricKey of trackedMetrics) {
+                chartPoint[metricKey] =
+                    point[metricKey] ?? null;
+            }
+
+            return chartPoint;
         });
-    }, [points]);
+    }, [points, trackedMetrics]);
 
     const estimatedPointsPerSecond =
         useMemo(() => {
@@ -138,44 +138,48 @@ export default function HistoricalSessionChart({
             );
         }, [estimatedPointsPerSecond]);
 
+
+
     const [visibleRange, setVisibleRange] =
         useState<VisibleRange>({
             startIndex: 0,
             endIndex: 0,
         });
 
-    useEffect(() => {
+    const effectiveVisibleRange = useMemo(() => {
         if (chartData.length === 0) {
-            setVisibleRange({
+            return {
                 startIndex: 0,
                 endIndex: 0,
-            });
-
-            return;
+            };
         }
 
-        setVisibleRange({
-            startIndex: 0,
-            endIndex: Math.min(
-                chartData.length - 1,
-                defaultWindowPointCount - 1
+        const lastIndex =
+            chartData.length - 1;
+
+        return {
+            startIndex: Math.min(
+                visibleRange.startIndex,
+                lastIndex
             ),
-        });
+            endIndex: Math.min(
+                Math.max(
+                    visibleRange.endIndex,
+                    visibleRange.startIndex
+                ),
+                lastIndex
+            ),
+        };
     }, [
         chartData.length,
-        defaultWindowPointCount,
+        visibleRange.startIndex,
+        visibleRange.endIndex,
     ]);
 
-    const visibleData = useMemo(() => {
-        if (chartData.length === 0) {
-            return [];
-        }
-
-        return chartData.slice(
-            visibleRange.startIndex,
-            visibleRange.endIndex + 1
-        );
-    }, [chartData, visibleRange]);
+    const visibleData = chartData.slice(
+        effectiveVisibleRange.startIndex,
+        effectiveVisibleRange.endIndex + 1
+    );
 
     const visibleStartPoint =
         visibleData[0] ?? null;
@@ -876,13 +880,32 @@ function getMetricDomain(
     switch (metricKey) {
         case "speed_mph":
         case "rpm":
+        case "engine_runtime_seconds":
+        case "fuel_rate_lph":
+        case "fuel_rail_pressure_kpa":
+        case "intake_pressure_kpa":
+        case "barometric_pressure_kpa":
+        case "maf_gps":
+        case "battery_voltage":
             return [0, "auto"];
 
         case "throttle_percent":
+        case "accelerator_percent":
+        case "engine_load_percent":
+        case "absolute_load_percent":
+        case "fuel_level_percent":
             return [0, 100];
 
-        case "coolant_temp_f":
+        case "short_fuel_trim_percent":
+        case "long_fuel_trim_percent":
+        case "timing_advance_degrees":
         case "boost_psi":
+        case "coolant_temp_f":
+        case "intake_temp_f":
+        case "engine_oil_temp_f":
+        case "ambient_temp_f":
+        case "catalyst_temp_f":
+        case "commanded_equivalence_ratio":
         default:
             return ["auto", "auto"];
     }
@@ -927,42 +950,51 @@ function formatMetricValue(
     if (
         value === null ||
         value === undefined ||
-        !Number.isFinite(Number(value))
+        !Number.isFinite(value)
     ) {
         return "—";
     }
 
-    const numericValue = Number(value);
+    switch (unit) {
+        case "rpm":
+            return `${Math.round(
+                value
+            ).toLocaleString()} rpm`;
 
-    if (unit === "rpm") {
-        return `${Math.round(
-            numericValue
-        ).toLocaleString()} rpm`;
+        case "%":
+            return `${value.toFixed(1)}%`;
+
+        case "°F":
+            return `${Math.round(value)}°F`;
+
+        case "mph":
+            return `${value.toFixed(1)} mph`;
+
+        case "psi":
+            return `${value.toFixed(1)} psi`;
+
+        case "kPa":
+            return `${value.toFixed(1)} kPa`;
+
+        case "g/s":
+            return `${value.toFixed(2)} g/s`;
+
+        case "L/h":
+            return `${value.toFixed(2)} L/h`;
+
+        case "V":
+            return `${value.toFixed(2)} V`;
+
+        case "°":
+            return `${value.toFixed(1)}°`;
+
+        case "λ":
+            return value.toFixed(3);
+
+        case "sec":
+            return `${Math.round(value)} sec`;
+
+        default:
+            return `${value} ${unit}`;
     }
-
-    if (unit === "%") {
-        return `${Math.round(
-            numericValue
-        )}%`;
-    }
-
-    if (unit === "°F") {
-        return `${Math.round(
-            numericValue
-        )}°F`;
-    }
-
-    if (unit === "mph") {
-        return `${Math.round(
-            numericValue
-        )} mph`;
-    }
-
-    if (unit === "psi") {
-        return `${numericValue.toFixed(
-            1
-        )} psi`;
-    }
-
-    return `${numericValue} ${unit}`;
 }

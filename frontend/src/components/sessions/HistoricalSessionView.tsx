@@ -9,9 +9,9 @@ import { useAuth } from "@clerk/nextjs";
 import { toast } from "sonner";
 
 import SessionHeader from "@/components/sessions/SessionHeader";
-import SessionStats from "@/components/sessions/SessionStats";
+// import SessionStats from "@/components/sessions/SessionStats";
 import HistoricalSessionChart from "@/components/sessions/HistoricalSessionChart";
-import DownloadSessionCsvButton from "@/components/sessions/DownloadSessionCsvButton";
+// import DownloadSessionCsvButton from "@/components/sessions/DownloadSessionCsvButton";
 
 import {
     getSessionCsvTelemetry,
@@ -108,17 +108,31 @@ export default function HistoricalSessionView({
         };
     }, [getToken, session.id]);
 
-    const currentPoint =
-        telemetryPoints[
-        telemetryPoints.length - 1
-        ] ?? null;
+    // const currentPoint =
+    //     telemetryPoints[
+    //     telemetryPoints.length - 1
+    //     ] ?? null;
 
     const liveStats =
         useMemo<LiveSessionStats>(() => {
+            const speedValues =
+                telemetryPoints
+                    .map(
+                        (point) =>
+                            point.speed_mph
+                    )
+                    .filter(
+                        (
+                            value
+                        ): value is number =>
+                            typeof value ===
+                            "number"
+                    );
+
             const speedSumMph =
-                telemetryPoints.reduce(
-                    (sum, point) =>
-                        sum + point.speed_mph,
+                speedValues.reduce(
+                    (sum, speed) =>
+                        sum + speed,
                     0
                 );
 
@@ -131,10 +145,12 @@ export default function HistoricalSessionView({
                     session.max_speed_mph,
                 avg_speed_mph:
                     session.avg_speed_mph ?? 0,
-                max_rpm: session.max_rpm,
+                max_rpm:
+                    session.max_rpm,
                 telemetry_count:
                     telemetryPoints.length,
-                speed_sum_mph: speedSumMph,
+                speed_sum_mph:
+                    speedSumMph,
             };
         }, [
             session.avg_speed_mph,
