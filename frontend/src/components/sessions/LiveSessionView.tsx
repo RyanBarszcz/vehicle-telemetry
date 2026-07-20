@@ -18,7 +18,7 @@ import {
 } from "@/lib/loggerClient";
 
 import SessionHeader from "@/components/sessions/SessionHeader";
-import SessionStats from "@/components/sessions/SessionStats";
+// import SessionStats from "@/components/sessions/SessionStats";
 import SessionChart from "@/components/sessions/SessionChart";
 import EndSessionModal from "@/components/sessions/EndSessionModal";
 import TrackingOptionsModal from "@/components/sessions/TrackingOptionsModal";
@@ -46,15 +46,15 @@ type LiveSessionViewProps = {
     initialSession: DrivingSession;
 };
 
-function numberFromLoggerValue(
-    value: string | number | null | undefined
-): number {
-    const parsedValue = Number(value ?? 0);
+// function numberFromLoggerValue(
+//     value: string | number | null | undefined
+// ): number {
+//     const parsedValue = Number(value ?? 0);
 
-    return Number.isFinite(parsedValue)
-        ? parsedValue
-        : 0;
-}
+//     return Number.isFinite(parsedValue)
+//         ? parsedValue
+//         : 0;
+// }
 
 function nullableNumberFromLoggerValue(
     value: string | number | null | undefined
@@ -271,21 +271,24 @@ export default function LiveSessionView({
                 const telemetryCount =
                     previousStats.telemetry_count + 1;
 
+                const speedMph = point.speed_mph ?? 0;
+                const rpm = point.rpm ?? 0;
+
                 const speedSumMph =
                     previousStats.speed_sum_mph +
-                    point.speed_mph;
+                    (point.speed_mph ?? 0);
 
                 return {
                     ...previousStats,
                     max_speed_mph: Math.max(
                         previousStats.max_speed_mph,
-                        point.speed_mph
+                        speedMph
                     ),
                     avg_speed_mph:
                         speedSumMph / telemetryCount,
                     max_rpm: Math.max(
                         previousStats.max_rpm,
-                        point.rpm
+                        rpm
                     ),
                     telemetry_count:
                         telemetryCount,
@@ -425,29 +428,14 @@ export default function LiveSessionView({
                     timestamp;
 
                 const point: LiveTelemetryPoint = {
-                    id: crypto.randomUUID(),
-                    sessionId: session.id,
                     timestamp,
-                    speed_mph:
-                        numberFromLoggerValue(
-                            values.speed_mph
-                        ),
-                    rpm: numberFromLoggerValue(
-                        values.rpm
-                    ),
-                    throttle_percent:
-                        numberFromLoggerValue(
-                            values.throttle_percent
-                        ),
-                    coolant_temp_f:
-                        numberFromLoggerValue(
-                            values.coolant_temp_f
-                        ),
-                    boost_psi:
-                        nullableNumberFromLoggerValue(
-                            values.boost_psi
-                        ),
                 };
+
+                for (const metric of trackedMetrics) {
+                    point[metric] = nullableNumberFromLoggerValue(
+                        values[metric]
+                    );
+                }
 
                 handleTelemetryPoint(point);
             } catch (error) {
@@ -478,6 +466,7 @@ export default function LiveSessionView({
         session.ended_at,
         session.id,
         trackingConfirmed,
+        trackedMetrics
     ]);
 
     function handleEndSession() {
