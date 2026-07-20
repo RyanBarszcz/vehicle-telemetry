@@ -33,9 +33,9 @@ type SessionChartProps = {
     sessionId: string;
     points: LiveTelemetryPoint[];
     currentPoint: LiveTelemetryPoint | null;
-    trackedMetrics: TelemetryMetricKey[];
+    trackedMetrics: ChartMetricKey[];
     onReorderMetrics: (
-        metrics: TelemetryMetricKey[]
+        metrics: ChartMetricKey[]
     ) => void;
 };
 
@@ -48,6 +48,11 @@ type ChartDataPoint = {
     coolant_temp_f: number;
     boost_psi: number;
 };
+
+type ChartMetricKey = keyof Omit<
+    ChartDataPoint,
+    "index" | "time"
+>;
 
 export default function SessionChart({
     points,
@@ -95,12 +100,12 @@ export default function SessionChart({
 
         const oldIndex =
             trackedMetrics.indexOf(
-                active.id as TelemetryMetricKey
+                active.id as ChartMetricKey
             );
 
         const newIndex =
             trackedMetrics.indexOf(
-                over.id as TelemetryMetricKey
+                over.id as ChartMetricKey
             );
 
         if (
@@ -167,9 +172,12 @@ export default function SessionChart({
                                                 chartData
                                             }
                                             latestValue={
-                                                latest?.[
-                                                metricKey
-                                                ]
+                                                latest
+                                                    ? getNumericMetricValue(
+                                                        latest,
+                                                        metricKey
+                                                    )
+                                                    : null
                                             }
                                         />
                                     )
@@ -427,4 +435,15 @@ function formatMetricValue(
     }
 
     return `${numericValue} ${unit}`;
+}
+
+function getNumericMetricValue(
+    point: LiveTelemetryPoint,
+    metricKey: ChartMetricKey
+): number | null | undefined {
+    const value = point[metricKey];
+
+    return typeof value === "number"
+        ? value
+        : null;
 }
