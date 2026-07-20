@@ -85,8 +85,7 @@ export default function LoggerRequiredModal({
                     </p>
 
                     <a
-                        href="/downloads/DriveIQ-Logger-Windows.zip"
-                        download
+                        href={process.env.NEXT_PUBLIC_LOGGER_DOWNLOAD_URL}
                         className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-blue-400 transition hover:text-blue-300"
                     >
                         <Download className="h-4 w-4" />

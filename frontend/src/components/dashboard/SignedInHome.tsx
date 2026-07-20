@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
 
+import DownloadLoggerButton from "@/components/logger/DownloadLoggerButton";
 import DashboardSession from "./DashboardSession";
 import DashboardVehicle from "./DashboardVehicle";
 import {
@@ -102,12 +103,62 @@ export default function SignedInHome() {
                             Start Session
                         </Link>
 
+                        <DownloadLoggerButton compact />
+
                         <Link
                             href="/garage/new"
                             className="rounded-full border border-white/10 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
                         >
                             Add Vehicle
                         </Link>
+                    </div>
+                </section>
+
+                <section className="mt-8 rounded-3xl border border-blue-500/20 bg-blue-500/[0.06] p-6">
+                    <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-center">
+                        <div>
+                            <p className="text-sm font-medium text-blue-400">
+                                Windows Logger Required
+                            </p>
+
+                            <h2 className="mt-2 text-2xl font-semibold">
+                                Connect your vehicle to the telemetry platform
+                            </h2>
+
+                            <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-400">
+                                The Windows logger connects to your USB OBD-II adapter,
+                                records vehicle telemetry, and securely uploads the completed
+                                session to your account.
+                            </p>
+                        </div>
+
+                        <DownloadLoggerButton className="shrink-0" />
+                    </div>
+
+                    <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        <LoggerStep
+                            number="1"
+                            title="Download"
+                            description="Download and extract the Windows logger ZIP."
+                        />
+
+                        <LoggerStep
+                            number="2"
+                            title="Start Logger"
+                            description="Run VehicleTelemetryLogger.exe and leave it open."
+                        />
+
+                        <LoggerStep
+                            number="3"
+                            title="Connect Adapter"
+                            description="Connect the Vgate adapter to the vehicle and computer."
+                        />
+
+                        <LoggerStep
+                            number="4"
+                            title="Start Session"
+                            description="Return to the website and begin a tracked run."
+                        />
                     </div>
                 </section>
 
@@ -246,4 +297,32 @@ export default function SignedInHome() {
             </div>
         </main>
     );
+
+    type LoggerStepProps = {
+        number: string;
+        title: string;
+        description: string;
+    };
+
+    function LoggerStep({
+        number,
+        title,
+        description,
+    }: LoggerStepProps) {
+        return (
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white">
+                    {number}
+                </div>
+
+                <h3 className="mt-4 font-semibold text-white">
+                    {title}
+                </h3>
+
+                <p className="mt-1 text-sm leading-5 text-zinc-400">
+                    {description}
+                </p>
+            </div>
+        );
+    }
 }

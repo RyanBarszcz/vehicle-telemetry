@@ -469,3 +469,17 @@ def stop_recording() -> dict[str, Any]:
             final_state["manifest"],
         "error": None,
     }
+
+def main() -> None:
+    import uvicorn
+
+    uvicorn.run(
+        app,
+        host="127.0.0.1",
+        port=8001,
+        log_level="info",
+    )
+
+
+if __name__ == "__main__":
+    main()
