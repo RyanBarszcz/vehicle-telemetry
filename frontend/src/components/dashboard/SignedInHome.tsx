@@ -103,7 +103,7 @@ export default function SignedInHome() {
                             Start Session
                         </Link>
 
-                        <DownloadLoggerButton compact />
+                        {/* <DownloadLoggerButton compact /> */}
 
                         <Link
                             href="/garage/new"

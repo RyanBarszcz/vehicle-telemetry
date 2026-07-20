@@ -101,7 +101,7 @@ export default function HistoricalSessionChart({
                     point.throttle_percent,
                 coolant_temp_f:
                     point.coolant_temp_f,
-                boost_psi: point.boost_psi,
+                boost_psi: point.boost_psi ?? null,
             };
         });
     }, [points]);
