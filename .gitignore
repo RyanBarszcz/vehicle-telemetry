@@ -30,3 +30,7 @@ htmlcov/
 
 # Logs
 *.log
+
+logger/build/
+logger/dist/
+logger/release-test/
