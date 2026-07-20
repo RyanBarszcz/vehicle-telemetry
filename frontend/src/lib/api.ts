@@ -1,4 +1,4 @@
-import type { LocalTelemetryPoint } from "@/lib/localTelemetryDb";
+// import type { LocalTelemetryPoint } from "@/lib/localTelemetryDb";
 import type { LiveTelemetryPoint } from "@/types/telemetry";
 import type { Vehicle } from "@/types/vehicle";
 
@@ -487,26 +487,26 @@ export async function createTelemetryPoint(
   return res.json();
 }
 
-export async function createTelemetryBatch(
-  token: string,
-  sessionId: string,
-  points: LocalTelemetryPoint[]
-) {
-  const res = await fetch(`${API_URL}/sessions/${sessionId}/telemetry/batch`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ points }),
-  });
+// export async function createTelemetryBatch(
+//   token: string,
+//   sessionId: string,
+//   points: LocalTelemetryPoint[]
+// ) {
+//   const res = await fetch(`${API_URL}/sessions/${sessionId}/telemetry/batch`, {
+//     method: "POST",
+//     headers: {
+//       "Content-Type": "application/json",
+//       Authorization: `Bearer ${token}`,
+//     },
+//     body: JSON.stringify({ points }),
+//   });
 
-  if (!res.ok) {
-    throw new Error("Failed to upload telemetry batch");
-  }
+//   if (!res.ok) {
+//     throw new Error("Failed to upload telemetry batch");
+//   }
 
-  return res.json();
-}
+//   return res.json();
+// }
 
 // =====================
 // Dashboard
