@@ -53,7 +53,7 @@ export default function SignedOutHome() {
                             </Link>
 
                             <Link
-                                href="/sign-in"
+                                href="/login"
                                 className="rounded-full border border-white/10 px-7 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
                             >
                                 Sign In
