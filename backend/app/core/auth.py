@@ -26,13 +26,16 @@ def get_jwks() -> dict[str, Any]:
 
 
 def get_clerk_user_id(
-    credentials: HTTPAuthorizationCredentials = Depends(
-        security
-    ),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
 ) -> str:
     token = credentials.credentials
 
     try:
+        unverified_payload = jwt.get_unverified_claims(token)
+
+        print("TOKEN ISSUER:", unverified_payload.get("iss"))
+        print("EXPECTED ISSUER:", settings.CLERK_ISSUER)
+
         token_header = jwt.get_unverified_header(token)
         key_id = token_header.get("kid")
 
@@ -67,6 +70,12 @@ def get_clerk_user_id(
             )
 
         if signing_key is None:
+            print("TOKEN KID:", key_id)
+            print(
+                "AVAILABLE JWKS KIDS:",
+                [key.get("kid") for key in jwks.get("keys", [])],
+            )
+
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid authentication token",
@@ -94,8 +103,24 @@ def get_clerk_user_id(
 
     except HTTPException:
         raise
-    except (JWTError, requests.RequestException, KeyError):
+    except JWTError as error:
+        print("JWT ERROR:", repr(error))
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication token",
-        )
+        ) from error
+    except requests.RequestException as error:
+        print("JWKS REQUEST ERROR:", repr(error))
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token",
+        ) from error
+    except KeyError as error:
+        print("JWT KEY ERROR:", repr(error))
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token",
+        ) from error
