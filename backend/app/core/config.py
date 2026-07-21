@@ -7,6 +7,7 @@ class Settings(BaseSettings):
 
     CLERK_SECRET_KEY: str
     CLERK_JWKS_URL: str
+    CLERK_ISSUER: str
 
     model_config = SettingsConfigDict(
         env_file=".env",
