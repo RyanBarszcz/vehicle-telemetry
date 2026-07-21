@@ -13,6 +13,7 @@ FRONTEND_ORIGINS = [
     for origin in os.getenv(
         "DRIVEIQ_FRONTEND_ORIGINS",
         "http://localhost:3000,http://127.0.0.1:3000",
+        "https://telemetry.ryanbarszcz.com",
     ).split(",")
     if origin.strip()
 ]
