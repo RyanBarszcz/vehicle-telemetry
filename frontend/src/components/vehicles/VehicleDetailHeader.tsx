@@ -40,10 +40,11 @@ export default function VehicleDetailHeader({
                 <div className="flex flex-wrap gap-3">
                     <StartSessionButton vehicleId={vehicle.id} />
 
-                    <button className="inline-flex items-center gap-2 rounded-full border border-white/10 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10">
+                    {/* TODO: Add this functionality */}
+                    {/* <button className="inline-flex items-center gap-2 rounded-full border border-white/10 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10">
                         <Settings className="h-4 w-4" />
                         Manage
-                    </button>
+                    </button> */}
                 </div>
             </div>
         </section>
