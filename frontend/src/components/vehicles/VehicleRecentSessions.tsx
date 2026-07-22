@@ -1,67 +1,13 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { useAuth } from "@clerk/nextjs";
-
 import SessionCard from "@/components/sessions/SessionCard";
-import {
-    DrivingSession,
-    getVehicleSessions,
-} from "@/lib/api";
+import type { DrivingSession } from "@/lib/api";
 
 type VehicleRecentSessionsProps = {
-    vehicleId: string;
+    sessions: DrivingSession[];
 };
 
 export default function VehicleRecentSessions({
-    vehicleId,
+    sessions,
 }: VehicleRecentSessionsProps) {
-    const { getToken } = useAuth();
-
-    const [sessions, setSessions] = useState<DrivingSession[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        async function loadSessions() {
-            try {
-                setLoading(true);
-
-                const token = await getToken();
-
-                if (!token) {
-                    return;
-                }
-
-                const data = await getVehicleSessions(
-                    token,
-                    vehicleId
-                );
-
-                setSessions(data);
-            } catch (error) {
-                console.error(error);
-            } finally {
-                setLoading(false);
-            }
-        }
-
-        loadSessions();
-    }, [vehicleId, getToken]);
-
-    if (loading) {
-        return (
-            <section>
-                <h2 className="text-2xl font-semibold text-white">
-                    Recent Sessions
-                </h2>
-
-                <p className="mt-4 text-sm text-zinc-400">
-                    Loading sessions...
-                </p>
-            </section>
-        );
-    }
-
     return (
         <section>
             <div className="mb-5">
