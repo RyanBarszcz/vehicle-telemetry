@@ -139,13 +139,18 @@ export async function startLoggerSession(
     return response.json();
 }
 
-export async function stopLoggerSession(): Promise<StopLoggerResponse> {
-    const response = await fetch(
-        `${LOGGER_URL}/stop`,
-        {
-            method: "POST",
-        }
-    );
+export async function stopLoggerSession(
+    token: string
+): Promise<StopLoggerResponse> {
+    const response = await fetch(`${LOGGER_URL}/stop`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            token,
+        }),
+    });
 
     if (!response.ok) {
         throw new Error(

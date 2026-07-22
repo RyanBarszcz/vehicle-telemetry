@@ -506,7 +506,7 @@ export default function LiveSessionView({
              * 5. returns the upload result.
              */
             const stopResult =
-                await stopLoggerSession();
+                await stopLoggerSession(token);
 
             if (
                 stopResult.upload_status !==
