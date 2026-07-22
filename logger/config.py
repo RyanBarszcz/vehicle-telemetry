@@ -6,7 +6,7 @@ load_dotenv()
 
 API_URL = os.getenv(
     "DRIVEIQ_API_URL",
-    "http://127.0.0.1:8000",
+    "https://back-end-vehicle-telemetry.vercel.app",
 ).rstrip("/")
 
 FRONTEND_ORIGINS = [
