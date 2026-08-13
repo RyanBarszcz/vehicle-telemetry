@@ -19,6 +19,12 @@ def test_send_session_uploaded_event_sends_expected_message(monkeypatch):
         FakeSqsClient(),
     )
 
+    monkeypatch.setattr(
+        telemetry_worker.settings,
+        "SQS_TELEMETRY_QUEUE_URL",
+        "https://example.com/test-queue",
+    )
+
     telemetry_queue.send_session_uploaded_event(
         session_id="session-123",
         s3_key="sessions/session-123/telemetry.csv",
@@ -46,6 +52,12 @@ def test_send_session_uploaded_event_sends_expected_message(monkeypatch):
 
 def test_successful_message_is_deleted(monkeypatch):
     deleted_messages = []
+
+    monkeypatch.setattr(
+        telemetry_worker.settings,
+        "SQS_TELEMETRY_QUEUE_URL",
+        "https://example.com/test-queue",
+    )
 
     message = {
         "Body": json.dumps(
@@ -94,6 +106,12 @@ def test_successful_message_is_deleted(monkeypatch):
 
 def test_failed_message_is_not_deleted(monkeypatch):
     deleted_messages = []
+
+    monkeypatch.setattr(
+        telemetry_worker.settings,
+        "SQS_TELEMETRY_QUEUE_URL",
+        "https://example.com/test-queue",
+    )
 
     message = {
         "Body": json.dumps(

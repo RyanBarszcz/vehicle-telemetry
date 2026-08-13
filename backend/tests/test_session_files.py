@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, Mock
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
+from app.routes import session_files
 
 from app.models.session import DrivingSession
 
@@ -54,6 +55,12 @@ def test_upload_session_csv_saves_file_metadata(
     monkeypatch.setattr(
         "app.routes.session_files.upload_csv_to_s3",
         mock_upload,
+    )
+
+    monkeypatch.setattr(
+        session_files,
+        "send_session_uploaded_event",
+        lambda session_id, s3_key: None,
     )
 
     response = authenticated_client.post(
