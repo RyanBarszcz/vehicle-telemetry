@@ -24,6 +24,7 @@ from app.services.s3_service import (
     download_session_csv_from_s3,
     upload_session_csv as upload_csv_to_s3,
 )
+from app.services.telemetry_queue import send_session_uploaded_event
 
 router = APIRouter(tags=["Session Files"])
 
@@ -167,6 +168,11 @@ async def upload_session_csv_route(
     upload_result = await upload_csv_to_s3(
         session_id=session_id,
         csv_file=csv_file,
+    )
+
+    send_session_uploaded_event(
+        session_id=session_id,
+        s3_key=upload_result["s3_key"],
     )
 
     session.selected_metrics = manifest.get("selected_metrics")
