@@ -2,6 +2,8 @@ const LOGGER_URL =
     process.env.NEXT_PUBLIC_LOGGER_URL ??
     "http://127.0.0.1:8765";
 
+const LOGGER_WS_URL = LOGGER_URL.replace(/^http/, "ws");
+
 export async function checkLoggerHealth(): Promise<boolean> {
     try {
         const controller = new AbortController();
@@ -24,10 +26,7 @@ export async function checkLoggerHealth(): Promise<boolean> {
     }
 }
 
-export type LoggerPointValue =
-    | string
-    | number
-    | null;
+export type LoggerPointValue = string | number | null;
 
 export type StartLoggerSessionInput = {
     session_id: string;
@@ -72,6 +71,23 @@ export type StopLoggerResponse = {
     last_file: LoggerFilePair | null;
     upload_status: LoggerUploadStatus;
     error: string | null;
+};
+
+export type LoggerTelemetryMessage = {
+    type: "telemetry";
+    session_id: string;
+    point: Record<string, LoggerPointValue>;
+};
+
+export type LoggerTelemetrySocketHandlers = {
+    onTelemetry: (message: LoggerTelemetryMessage) => void;
+    onOpen?: () => void;
+    onClose?: () => void;
+    onError?: () => void;
+};
+
+export type LoggerTelemetrySocketConnection = {
+    close: () => void;
 };
 
 async function getErrorMessage(
@@ -182,4 +198,81 @@ export async function getLoggerStatus(): Promise<LoggerStatus> {
     }
 
     return response.json();
+}
+
+export function connectTelemetrySocket(
+    handlers: LoggerTelemetrySocketHandlers
+): LoggerTelemetrySocketConnection {
+    let socket: WebSocket | null = null;
+    let reconnectTimeout: number | null = null;
+    let reconnectAttempt = 0;
+    let closedByClient = false;
+
+    const connect = () => {
+        socket = new WebSocket(
+            `${LOGGER_WS_URL}/ws/telemetry`
+        );
+
+        socket.addEventListener("open", () => {
+            reconnectAttempt = 0;
+            handlers.onOpen?.();
+        });
+
+        socket.addEventListener("message", (event) => {
+            try {
+                const message = JSON.parse(
+                    event.data
+                ) as LoggerTelemetryMessage;
+
+                if (message.type !== "telemetry") {
+                    return;
+                }
+
+                handlers.onTelemetry(message);
+            } catch (error) {
+                console.error(
+                    "Failed to parse telemetry WebSocket message",
+                    error
+                );
+            }
+        });
+
+        socket.addEventListener("error", () => {
+            handlers.onError?.();
+        });
+
+        socket.addEventListener("close", () => {
+            handlers.onClose?.();
+
+            if (closedByClient) {
+                return;
+            }
+
+            const reconnectDelay = Math.min(
+                500 * 2 ** reconnectAttempt,
+                5000
+            );
+
+            reconnectAttempt += 1;
+
+            reconnectTimeout = window.setTimeout(
+                connect,
+                reconnectDelay
+            );
+        });
+    };
+
+    connect();
+
+    return {
+        close: () => {
+            closedByClient = true;
+
+            if (reconnectTimeout !== null) {
+                window.clearTimeout(reconnectTimeout);
+            }
+
+            socket?.close();
+        },
+    };
 }

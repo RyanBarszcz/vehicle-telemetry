@@ -2,8 +2,14 @@ import threading
 import time
 from typing import Any
 
+import asyncio
+
+from websocket_manager import websocket_manager
+
+from contextlib import asynccontextmanager
+
 import requests
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -17,8 +23,17 @@ from config import API_URL, FRONTEND_ORIGINS
 UPLOAD_TIMEOUT_SECONDS = 30
 STOP_TIMEOUT_SECONDS = UPLOAD_TIMEOUT_SECONDS + 10
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    websocket_manager.set_event_loop(
+        asyncio.get_running_loop()
+    )
+
+    yield
+
 app = FastAPI(
-    title="Vehicle Telemetry Logger Service"
+    title="Vehicle Telemetry Logger Service",
+    lifespan=lifespan
 )
 
 # TODO: Change origin to frontend and I think the other is backend
@@ -42,7 +57,6 @@ class StartRequest(BaseModel):
         le=20,
     )
     auth_token: str
-
 
 recording_thread: threading.Thread | None = None
 connection_thread: threading.Thread | None = None
@@ -163,15 +177,22 @@ def recording_loop(request: StartRequest) -> None:
             loop_started_at = time.monotonic()
 
             point = reader.read_point()
+            point_data = point.to_dict()
 
             recorder.write_point(point)
             manifest.increment_samples()
 
             update_state(
-                sample_count=
-                    manifest.sample_count,
-                latest_point=
-                    point.to_dict(),
+                sample_count=manifest.sample_count,
+                latest_point=point_data,
+            )
+
+            websocket_manager.broadcast_from_thread(
+                {
+                    "type": "telemetry",
+                    "session_id": request.session_id,
+                    "point": point_data,
+                }
             )
 
             elapsed_seconds = (
@@ -262,6 +283,19 @@ def connect_obd_loop() -> None:
             connection_status="failed",
             error=str(error),
         )
+
+@app.websocket("/ws/telemetry")
+async def telemetry_websocket(
+    websocket: WebSocket,
+) -> None:
+    await websocket_manager.connect(websocket)
+
+    try:
+        while True:
+            await websocket.receive_text()
+
+    except WebSocketDisconnect:
+        websocket_manager.disconnect(websocket)
 
 
 @app.get("/health")
@@ -469,17 +503,3 @@ def stop_recording() -> dict[str, Any]:
             final_state["manifest"],
         "error": None,
     }
-
-def main() -> None:
-    import uvicorn
-
-    uvicorn.run(
-        app,
-        host="127.0.0.1",
-        port=8001,
-        log_level="info",
-    )
-
-
-if __name__ == "__main__":
-    main()
