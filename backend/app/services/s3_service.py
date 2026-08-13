@@ -1,27 +1,24 @@
-import os
 from uuid import uuid4
 
 import boto3
 from botocore.exceptions import ClientError
 from fastapi import UploadFile
 
+from app.core.config import settings
 
-AWS_REGION = os.getenv("AWS_REGION")
-S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
 
 s3_client = boto3.client(
     "s3",
-    region_name=AWS_REGION,
-    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-    aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+    region_name=settings.AWS_REGION,
+    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
 )
-
 
 async def upload_session_csv(
     session_id: str,
     csv_file: UploadFile,
 ) -> dict:
-    if not S3_BUCKET_NAME:
+    if not settings.S3_BUCKET_NAME:
         raise RuntimeError("S3_BUCKET_NAME is not configured")
 
     file_bytes = await csv_file.read()
@@ -30,7 +27,7 @@ async def upload_session_csv(
     s3_key = f"sessions/{session_id}/{file_name}"
 
     s3_client.put_object(
-        Bucket=S3_BUCKET_NAME,
+        Bucket=settings.S3_BUCKET_NAME,
         Key=s3_key,
         Body=file_bytes,
         ContentType="text/csv",
@@ -45,7 +42,7 @@ async def upload_session_csv(
 def download_session_csv_from_s3(
     s3_key: str,
 ) -> bytes:
-    if not S3_BUCKET_NAME:
+    if not settings.S3_BUCKET_NAME:
         raise RuntimeError(
             "S3_BUCKET_NAME is not configured"
         )
@@ -57,7 +54,7 @@ def download_session_csv_from_s3(
     
     try:
         response = s3_client.get_object(
-            Bucket=S3_BUCKET_NAME,
+            Bucket=settings.S3_BUCKET_NAME,
             Key=s3_key,
         )
 
@@ -76,7 +73,7 @@ def download_session_csv_from_s3(
 
         raise RuntimeError(
             f"S3 download failed "
-            f"for bucket={S3_BUCKET_NAME}, "
+            f"for bucket={settings.S3_BUCKET_NAME}, "
             f"key={s3_key}, "
             f"code={error_code}, "
             f"message={error_message}"
