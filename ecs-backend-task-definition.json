@@ -1,0 +1,54 @@
+{
+  "family": "driveiq-backend",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::795176248415:role/driveiqEcsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::795176248415:role/driveiqBackendTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "driveiq-backend",
+      "image": "795176248415.dkr.ecr.us-east-2.amazonaws.com/driveiq-backend:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "FRONTEND_URL",
+          "value": "https://telemetry.ryanbarszcz.com"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "DATABASE_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:795176248415:secret:driveiq/backend/production-mZ0IWC:DATABASE_URL::"
+        },
+        {
+          "name": "CLERK_SECRET_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:795176248415:secret:driveiq/backend/production-mZ0IWC:CLERK_SECRET_KEY::"
+        },
+        {
+          "name": "CLERK_JWKS_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:795176248415:secret:driveiq/backend/production-mZ0IWC:CLERK_JWKS_URL::"
+        },
+        {
+          "name": "CLERK_ISSUER",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:795176248415:secret:driveiq/backend/production-mZ0IWC:CLERK_ISSUER::"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/driveiq-backend",
+          "awslogs-region": "us-east-2",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}
