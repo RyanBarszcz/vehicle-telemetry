@@ -1,4 +1,4 @@
-name: Backend CI
+name: Backend CI/CD
 
 on:
   push:
@@ -10,6 +10,16 @@ on:
 
 permissions:
   contents: read
+
+env:
+  AWS_REGION: us-east-2
+  ECS_CLUSTER: driveiq-cluster
+  BACKEND_ECR_REPOSITORY: driveiq-backend
+  WORKER_ECR_REPOSITORY: driveiq-worker
+  BACKEND_ECS_SERVICE: driveiq-backend-service
+  WORKER_ECS_SERVICE: driveiq-worker-service
+  BACKEND_TASK_DEFINITION: ecs-backend-task-definition.json
+  WORKER_TASK_DEFINITION: ecs-worker-task-definition.json
 
 jobs:
   backend-tests:
@@ -49,3 +59,111 @@ jobs:
 
       - name: Build backend Docker image
         run: docker build --file backend/Dockerfile --tag driveiq-backend:test backend
+
+  worker-docker-build:
+    name: Worker Docker Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build worker Docker image
+        run: docker build --file backend/Dockerfile.worker --tag driveiq-worker:test backend
+
+  deploy:
+    name: Deploy to AWS ECS
+    runs-on: ubuntu-latest
+
+    needs:
+      - backend-tests
+      - backend-docker-build
+      - worker-docker-build
+
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6.2.3
+        with:
+          role-to-assume: arn:aws:iam::795176248415:role/driveiqGitHubActionsRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push backend image
+        id: backend-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          BACKEND_IMAGE="$ECR_REGISTRY/$BACKEND_ECR_REPOSITORY:$IMAGE_TAG"
+
+          docker build \
+            --file backend/Dockerfile \
+            --tag "$BACKEND_IMAGE" \
+            backend
+
+          docker push "$BACKEND_IMAGE"
+
+          echo "image=$BACKEND_IMAGE" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push worker image
+        id: worker-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          WORKER_IMAGE="$ECR_REGISTRY/$WORKER_ECR_REPOSITORY:$IMAGE_TAG"
+
+          docker build \
+            --file backend/Dockerfile.worker \
+            --tag "$WORKER_IMAGE" \
+            backend
+
+          docker push "$WORKER_IMAGE"
+
+          echo "image=$WORKER_IMAGE" >> "$GITHUB_OUTPUT"
+
+      - name: Render backend ECS task definition
+        id: backend-task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ env.BACKEND_TASK_DEFINITION }}
+          container-name: driveiq-backend
+          image: ${{ steps.backend-image.outputs.image }}
+
+      - name: Deploy backend ECS service
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.backend-task-def.outputs.task-definition }}
+          service: ${{ env.BACKEND_ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+          wait-max-delay-seconds: 15
+
+      - name: Render worker ECS task definition
+        id: worker-task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ env.WORKER_TASK_DEFINITION }}
+          container-name: driveiq-worker
+          image: ${{ steps.worker-image.outputs.image }}
+
+      - name: Deploy worker ECS service
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.worker-task-def.outputs.task-definition }}
+          service: ${{ env.WORKER_ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+          wait-max-delay-seconds: 15
