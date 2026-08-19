@@ -189,3 +189,86 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
     ]
   })
 }
+
+data "aws_iam_policy_document" "terraform_plan_assume_role" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+
+    principals {
+      type        = "Federated"
+      identifiers = [data.aws_iam_openid_connect_provider.github.arn]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:sub"
+
+      values = [
+        "repo:RyanBarszcz/vehicle-telemetry:pull_request",
+        "repo:RyanBarszcz/vehicle-telemetry:ref:refs/heads/main"
+      ]
+    }
+  }
+}
+
+resource "aws_iam_role" "terraform_plan" {
+  name = "driveiqTerraformPlanRole"
+
+  assume_role_policy = data.aws_iam_policy_document.terraform_plan_assume_role.json
+}
+
+resource "aws_iam_role_policy_attachment" "terraform_plan_read_only" {
+  role       = aws_iam_role.terraform_plan.name
+  policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
+}
+
+resource "aws_iam_role_policy" "terraform_plan_state" {
+  name = "DriveIQTerraformStateAccess"
+  role = aws_iam_role.terraform_plan.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+
+    Statement = [
+      {
+        Sid    = "ListTerraformStateBucket"
+        Effect = "Allow"
+
+        Action = [
+          "s3:ListBucket"
+        ]
+
+        Resource = "arn:aws:s3:::driveiq-terraform-state-795176248415-us-east-2"
+      },
+      {
+        Sid    = "ReadTerraformState"
+        Effect = "Allow"
+
+        Action = [
+          "s3:GetObject"
+        ]
+
+        Resource = "arn:aws:s3:::driveiq-terraform-state-795176248415-us-east-2/driveiq/terraform.tfstate"
+      },
+      {
+        Sid    = "ManageTerraformStateLock"
+        Effect = "Allow"
+
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject"
+        ]
+
+        Resource = "arn:aws:s3:::driveiq-terraform-state-795176248415-us-east-2/driveiq/terraform.tfstate.tflock"
+      }
+    ]
+  })
+}
