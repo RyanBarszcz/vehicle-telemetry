@@ -56,5 +56,23 @@ jobs:
       - name: Validate Terraform
         run: terraform validate
 
+      - name: Get current ECS images
+        shell: bash
+        run: |
+          BACKEND_IMAGE=$(aws ecs describe-task-definition \
+            --task-definition driveiq-backend \
+            --region "$AWS_REGION" \
+            --query 'taskDefinition.containerDefinitions[0].image' \
+            --output text)
+
+          WORKER_IMAGE=$(aws ecs describe-task-definition \
+            --task-definition driveiq-worker \
+            --region "$AWS_REGION" \
+            --query 'taskDefinition.containerDefinitions[0].image' \
+            --output text)
+
+          echo "TF_VAR_backend_image=$BACKEND_IMAGE" >> "$GITHUB_ENV"
+          echo "TF_VAR_worker_image=$WORKER_IMAGE" >> "$GITHUB_ENV"
+
       - name: Terraform plan
         run: terraform plan -input=false -no-color
